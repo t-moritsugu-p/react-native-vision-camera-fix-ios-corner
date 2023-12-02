@@ -1,6 +1,6 @@
 {
-  "name": "react-native-vision-camera",
-  "version": "3.6.12",
+  "name": "@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner",
+  "version": "0.0.1",
   "description": "A powerful, high-performance React Native Camera library.",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
@@ -67,11 +67,11 @@
     "processing",
     "realtime"
   ],
-  "repository": "https://github.com/mrousavy/react-native-vision-camera",
-  "author": "Marc Rousavy <marcrousavy@hotmail.com> (https://github.com/mrousavy)",
+  "repository": "https://github.com/t-moritsugu-p/react-native-vision-camera-fix-ios-corner",
+  "author": "t-mrtgu",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mrousavy/react-native-vision-camera/issues"
+    "url": "https://github.com/t-moritsugu-p/react-native-vision-camera-fix-ios-corner/issues"
   },
   "homepage": "https://react-native-vision-camera.com/",
   "publishConfig": {
