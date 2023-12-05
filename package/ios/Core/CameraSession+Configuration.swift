@@ -100,7 +100,16 @@ extension CameraSession {
     }
 
     // Video Output + Frame Processor
+    var isVideoOrCodeScannerEnabled = false
     if case .enabled = configuration.video {
+      isVideoOrCodeScannerEnabled = true
+    } else if case .enabled = configuration.codeScanner {
+      isVideoOrCodeScannerEnabled = true
+    }
+    
+      
+    // if case .enabled = configuration.video {
+    if isVideoOrCodeScannerEnabled {
       ReactLogger.log(level: .info, message: "Adding Video Data output...")
 
       // 1. Add
@@ -117,33 +126,33 @@ extension CameraSession {
     }
 
     // Code Scanner
-    if case let .enabled(codeScanner) = configuration.codeScanner {
-      ReactLogger.log(level: .info, message: "Adding Code Scanner output...")
-      let codeScannerOutput = AVCaptureMetadataOutput()
-
-      // 1. Add
-      guard captureSession.canAddOutput(codeScannerOutput) else {
-        throw CameraError.codeScanner(.notCompatibleWithOutputs)
-      }
-      captureSession.addOutput(codeScannerOutput)
-
-      // 2. Configure
-      let options = codeScanner.options
-      codeScannerOutput.setMetadataObjectsDelegate(self, queue: CameraQueues.codeScannerQueue)
-      try codeScanner.options.codeTypes.forEach { type in
-        // CodeScanner::availableMetadataObjectTypes depends on the connection to the
-        // AVCaptureSession, so this list is only available after we add the output to the session.
-        if !codeScannerOutput.availableMetadataObjectTypes.contains(type) {
-          throw CameraError.codeScanner(.codeTypeNotSupported(codeType: type.descriptor))
-        }
-      }
-      codeScannerOutput.metadataObjectTypes = options.codeTypes
-      if let rectOfInterest = options.regionOfInterest {
-        codeScannerOutput.rectOfInterest = rectOfInterest
-      }
-
-      self.codeScannerOutput = codeScannerOutput
-    }
+//    if case let .enabled(codeScanner) = configuration.codeScanner {
+//      ReactLogger.log(level: .info, message: "Adding Code Scanner output...")
+//      let codeScannerOutput = AVCaptureMetadataOutput()
+//
+//      // 1. Add
+//      guard captureSession.canAddOutput(codeScannerOutput) else {
+//        throw CameraError.codeScanner(.notCompatibleWithOutputs)
+//      }
+//      captureSession.addOutput(codeScannerOutput)
+//
+//      // 2. Configure
+//      let options = codeScanner.options
+//      codeScannerOutput.setMetadataObjectsDelegate(self, queue: CameraQueues.codeScannerQueue)
+//      try codeScanner.options.codeTypes.forEach { type in
+//        // CodeScanner::availableMetadataObjectTypes depends on the connection to the
+//        // AVCaptureSession, so this list is only available after we add the output to the session.
+//        if !codeScannerOutput.availableMetadataObjectTypes.contains(type) {
+//          throw CameraError.codeScanner(.codeTypeNotSupported(codeType: type.descriptor))
+//        }
+//      }
+//      codeScannerOutput.metadataObjectTypes = options.codeTypes
+//      if let rectOfInterest = options.regionOfInterest {
+//        codeScannerOutput.rectOfInterest = rectOfInterest
+//      }
+//
+//      self.codeScannerOutput = codeScannerOutput
+//    }
 
     // Done!
     ReactLogger.log(level: .info, message: "Successfully configured all outputs!")
