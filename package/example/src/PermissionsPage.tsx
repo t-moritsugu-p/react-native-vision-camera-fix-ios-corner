@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { ImageRequireSource, Linking } from 'react-native'
 
 import { StyleSheet, View, Text, Image } from 'react-native'
-import { Camera, CameraPermissionStatus } from 'react-native-vision-camera'
+import { Camera, CameraPermissionStatus } from '@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner'
 import { CONTENT_SPACING, SAFE_AREA_PADDING } from './Constants'
 import type { Routes } from './Routes'
 

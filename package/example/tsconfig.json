@@ -3,7 +3,7 @@
   "extends": "../tsconfig",
   "compilerOptions": {
     "paths": {
-      "react-native-vision-camera": ["../src/index"]
+      "@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner": ["../src/index"]
     },
   },
   "include": [

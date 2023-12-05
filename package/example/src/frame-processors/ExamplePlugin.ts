@@ -1,4 +1,4 @@
-import { VisionCameraProxy, Frame } from 'react-native-vision-camera'
+import { VisionCameraProxy, Frame } from '@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner'
 
 const plugin = VisionCameraProxy.initFrameProcessorPlugin('example_plugin')
 
