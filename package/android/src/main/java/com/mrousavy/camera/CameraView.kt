@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.camera2.CameraManager
 import android.util.Log
+import android.util.Size
 import android.view.ScaleGestureDetector
 import android.widget.FrameLayout
 import com.facebook.react.bridge.ReadableMap
@@ -235,8 +236,8 @@ class CameraView(context: Context) :
     invokeOnError(error)
   }
 
-  override fun onInitialized() {
-    invokeOnInitialized()
+  override fun onInitialized(codeScannerFrame: Size?) {
+    invokeOnInitialized(codeScannerFrame)
   }
 
   override fun onCodeScanned(codes: List<Barcode>, scannerFrame: CodeScannerFrame) {

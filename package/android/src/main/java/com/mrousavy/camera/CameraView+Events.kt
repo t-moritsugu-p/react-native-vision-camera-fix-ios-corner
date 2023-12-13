@@ -1,6 +1,7 @@
 package com.mrousavy.camera
 
 import android.util.Log
+import android.util.Size
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.WritableMap
@@ -12,11 +13,22 @@ import com.mrousavy.camera.core.UnknownCameraError
 import com.mrousavy.camera.core.code
 import com.mrousavy.camera.types.CodeType
 
-fun CameraView.invokeOnInitialized() {
+fun CameraView.invokeOnInitialized(size: Size?) {
   Log.i(CameraView.TAG, "invokeOnInitialized()")
 
+  val event = Arguments.createMap()
+  val codeScannerFrame = Arguments.createMap()
+  if (size != null) {
+    codeScannerFrame.putInt("width", size.width)
+    codeScannerFrame.putInt("height", size.height)
+  } else {
+    codeScannerFrame.putInt("width", 0)
+    codeScannerFrame.putInt("height", 0)
+  }
+  event.putMap("codeScannerFrame", codeScannerFrame)
+
   val reactContext = context as ReactContext
-  reactContext.getJSModule(RCTEventEmitter::class.java).receiveEvent(id, "cameraInitialized", null)
+  reactContext.getJSModule(RCTEventEmitter::class.java).receiveEvent(id, "cameraInitialized", event)
 }
 
 fun CameraView.invokeOnError(error: Throwable) {

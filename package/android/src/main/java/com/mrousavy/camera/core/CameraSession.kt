@@ -79,6 +79,8 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
   private val mutex = Mutex()
   private var isRunning = false
 
+  private var codeScannerFrame: Size? = null;
+
   override val coroutineContext: CoroutineContext
     get() = CameraQueues.cameraQueue.coroutineDispatcher
 
@@ -144,7 +146,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
 
         // Notify about Camera initialization
         if (diff.deviceChanged) {
-          callback.onInitialized()
+          callback.onInitialized(this.codeScannerFrame)
         }
       } catch (error: Throwable) {
         Log.e(TAG, "Failed to configure CameraSession! Error: ${error.message}, Config-Diff: $diff", error)
@@ -340,6 +342,8 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
       val imageFormat = ImageFormat.YUV_420_888
       val sizes = characteristics.getVideoSizes(cameraDevice.id, imageFormat)
       val size = sizes.closestToOrMax(Size(1280, 720))
+
+      this.codeScannerFrame = Size(size.width, size.height);
 
       Log.i(TAG, "Adding ${size.width} x ${size.height} CodeScanner Output in Format #$imageFormat...")
       val pipeline = CodeScannerPipeline(size, imageFormat, codeScanner.config, callback)
@@ -620,7 +624,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
 
   interface CameraSessionCallback {
     fun onError(error: Throwable)
-    fun onInitialized()
+    fun onInitialized(codeScannerFrame: Size?)
     fun onCodeScanned(codes: List<Barcode>, scannerFrame: CodeScannerFrame)
   }
 }
