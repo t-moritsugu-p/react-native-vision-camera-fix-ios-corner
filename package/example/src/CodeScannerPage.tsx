@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useCallback, useRef, useState } from 'react'
-import {Alert, AlertButton, Dimensions, Linking, StyleSheet, View} from 'react-native'
+import {Alert, AlertButton, Dimensions, Linking, Platform, StyleSheet, View} from 'react-native'
 import {
   Code,
   CodeScannerFrame,
@@ -61,53 +61,78 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
 
   const [targetBarcodes, setTargetBarcodes] = useState<BarcodeEx[]>([]);
 
-  // const [xRatio, setXRatio] = useState<Number>(0);
-  // const [yRatio, setYRatio] = useState<Number>(0);
-
   const WINDOW_HEIGHT = Dimensions.get('window').height;
   const WINDOW_WIDTH = Dimensions.get('window').width;
-  const [cameraHeight, setCameraHeight] = useState<Number>(0);
+  const [cameraHeight, setCameraHeight] = useState<number>(0);
 
-  const onCameraInit = () => {
+  const onCameraInit = (config: { codeScannerFrame: CodeScannerFrame }) => {
+    console.log('*********init*********');
+    console.log(config);
+    console.log('*********init end*********');
+    const frame = config.codeScannerFrame;
+    if (frame.width === 0 || frame.height === 0) {
+      return;
+    }
+
+    if (frame.width > frame.height) {
+      const logicalHeight = frame.width / frame.height * WINDOW_WIDTH;
+      setCameraHeight(logicalHeight);
+    } else {
+      const logicalHeight = frame.height / frame.width * WINDOW_WIDTH;
+    }
 
   }
 
 
   // 4. On code scanned, we show an aler to the user
   const isShowingAlert = useRef(false)
-  const onCodeScanned = useCallback((codes: Code[], frame: CodeScannerFrame) => {
+  const onCodeScanned = useCallback((srcCodes: Code[], srcFrame: CodeScannerFrame) => {
     // console.log(`Scanned ${codes.length} codes:`, codes)
     // console.log(`codeScanFrame:`, frame)
 
-    const value = codes[0]?.value
+    const value = srcCodes[0]?.value
     if (value == null) return
-    // console.log(codes[0]!.corners)
+
     // if (isShowingAlert.current) return
     // showCodeAlert(value, () => {
     //   isShowingAlert.current = false
     // })
     // isShowingAlert.current = true
-    let xRatio;
-    let yRatio;
-    let logicalHeightDiff;
+
+
+    // console.log(logicalHeightDiff)
+
+    //const detectedBarcodes: Code[] = invertCodeIfOriented(_.cloneDeep(srcCodes));
+    //const frame: CodeScannerFrame = invertFrameIfOriented(_.cloneDeep(srcFrame));
+
+
+    const codes: Code[] = invertCodeIfOriented(srcCodes);
+    const frame: CodeScannerFrame = invertFrameIfOriented(srcFrame);
+
+    // const codes: Code[] = srcCodes;
+    // const frame: CodeScannerFrame = srcFrame;
+
+    console.log(codes[0]!.corners)
+    console.log(codes[0]!.value)
+    console.log(WINDOW_WIDTH + ' ' + WINDOW_HEIGHT)
+
+    // 入力画像のサイズはonInitializedと変わらないが、useStateでxRatioを利用する形にすると何故か常に初期値が利用されてしまう
+    // そのため、毎回計算する。
+    let xRatio = 1;
+    let yRatio: number = 1;
     if (frame.width > frame.height) {
       xRatio = frame.height / WINDOW_WIDTH;
-
+      // yRatio.value = frame.width / WINDOW_HEIGHT;
       const logicalHeight = frame.width / frame.height * WINDOW_WIDTH;
-      logicalHeightDiff = logicalHeight - WINDOW_HEIGHT;
-      // setCameraHeight(logicalHeight);
-      // console.log('logicalHeight: ' + logicalHeight + ' ' + cameraHeight + 'w: ' + WINDOW_WIDTH + ' h:' + WINDOW_HEIGHT)
       yRatio = frame.width / logicalHeight;
+      console.log(logicalHeight + ' xr:' + xRatio + ' yr:' + yRatio)
     } else {
       xRatio = frame.width / WINDOW_WIDTH;
-
+      // yRatio.value = frame.height / WINDOW_HEIGHT;
       const logicalHeight = frame.height / frame.width * WINDOW_WIDTH;
-      logicalHeightDiff = logicalHeight - WINDOW_HEIGHT;
-      // setCameraHeight(logicalHeight)
-      // console.log('logicalHeight: ' + logicalHeight + ' ' + cameraHeight + 'w: ' + WINDOW_WIDTH + ' h:' + WINDOW_HEIGHT)
       yRatio = frame.height / logicalHeight;
+      console.log(logicalHeight + ' xr:' + xRatio + ' yr:' + yRatio)
     }
-    // console.log(logicalHeightDiff)
 
     const lists: BarcodeEx[] = [];
     for (const bc of codes) {
@@ -117,20 +142,20 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
       }
       const xArray = bc.corners.map(corner => corner.x);
       const yArray = bc.corners.map(corner => corner.y);
-      const resultPoints = {
+
+      // androidの場合、X座標の軸方向が反転している
+      const resultPoints = (Platform.OS === "ios")? {
         left: Math.min(...xArray) / xRatio,
         right: Math.max(...xArray) / xRatio,
-        bottom: Math.max(...yArray) / yRatio - ((logicalHeightDiff > 0)?  logicalHeightDiff / 2 : 0),
-        top: Math.min(...yArray) / yRatio - ((logicalHeightDiff > 0)?  logicalHeightDiff / 2 : 0),
-        // left: Math.min(...xArray) ,
-        // right: Math.max(...xArray) ,
-        // bottom: Math.max(...yArray) ,
-        // top: Math.min(...yArray) ,
-        // left: bc.frame.x,
-        // right: bc.frame.x + bc.frame.width,
-        // bottom: bc.frame.y + bc.frame.height,
-        // top: bc.frame?.y
-      };
+        bottom: Math.max(...yArray) / yRatio,
+        top: Math.min(...yArray) / yRatio,
+      } : {
+        left:  (frame.width - Math.max(...xArray)) / xRatio,
+        right: (frame.width - Math.min(...xArray)) / xRatio,
+        bottom: Math.max(...yArray) / yRatio,
+        top: Math.min(...yArray) / yRatio,
+      }
+
       lists.push({
         rawBarCode: bc.value,
         resultPoints: resultPoints,
@@ -157,7 +182,7 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
       {device != null && (
         <Camera
           // style={StyleSheet.absoluteFill}
-          style={[styles.barcodeArea, {height: WINDOW_HEIGHT}]}
+          style={[styles.barcodeArea, {height: cameraHeight}]}
           device={device}
           isActive={isActive}
           codeScanner={codeScanner}
@@ -165,6 +190,7 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
           enableZoomGesture={true}
           onInitialized={onCameraInit}
           ref={refCamera}
+          fps={6}
         />
       )}
 
@@ -204,6 +230,42 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
 
     </View>
   )
+}
+
+const invertCodeIfOriented = (codes: Code[]) => {
+  for (const bc of codes) {
+    if (!bc.frame || bc.frame.width > bc.frame.height) {
+      continue;
+    }
+    const x = bc.frame.y;
+    const y = bc.frame.x;
+    const width = bc.frame.height;
+    const height = bc.frame.width;
+    bc.frame.x = x;
+    bc.frame.y = y;
+    bc.frame.width = width;
+    bc.frame.height = height;
+
+    if (bc.corners) {
+      for (const corner of bc.corners) {
+        const cx = corner.y;
+        const cy = corner.x;
+        corner.x = cx;
+        corner.y = cy;
+      }
+    }
+  }
+  return codes;
+}
+
+const invertFrameIfOriented = (frame: CodeScannerFrame) => {
+  if (frame.width > frame.height) {
+    const width = frame.height;
+    const height = frame.width;
+    frame.width = width;
+    frame.height = height;
+  }
+  return frame;
 }
 
 const styles = StyleSheet.create({
