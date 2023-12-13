@@ -123,6 +123,12 @@ extension CameraSession {
       videoOutput.setSampleBufferDelegate(self, queue: CameraQueues.videoQueue)
       videoOutput.alwaysDiscardsLateVideoFrames = true
       self.videoOutput = videoOutput
+//      if case let .enabled(codeScanner) = configuration.codeScanner {
+//        let options = codeScanner.options
+//        if let rectOfInterest = options.regionOfInterest {
+//          self.codeScanArea = rectOfInterest
+//        }
+//      }
     }
 
     // Code Scanner

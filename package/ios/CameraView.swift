@@ -278,12 +278,13 @@ public final class CameraView: UIView, CameraSessionDelegate {
     ])
   }
 
-  func onSessionInitialized() {
+  func onSessionInitialized(initializedConfig: CameraSession.InitializedConfig) {
     ReactLogger.log(level: .info, message: "Camera initialized!")
     guard let onInitialized = onInitialized else {
       return
     }
-    onInitialized([String: Any]())
+    // onInitialized([String: Any]())
+    onInitialized(initializedConfig.toJSValue())
   }
 
   func onFrame(sampleBuffer: CMSampleBuffer) {

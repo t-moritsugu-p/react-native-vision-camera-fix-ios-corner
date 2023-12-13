@@ -17,6 +17,9 @@ import { Code, CodeScanner, CodeScannerFrame } from './CodeScanner'
 export type CameraPermissionStatus = 'granted' | 'not-determined' | 'denied' | 'restricted'
 export type CameraPermissionRequestResult = 'granted' | 'denied'
 
+interface OnInitializeEvent {
+  codeScannerFrame: CodeScannerFrame
+}
 interface OnCodeScannedEvent {
   codes: Code[]
   frame: CodeScannerFrame
@@ -30,7 +33,7 @@ type NativeCameraViewProps = Omit<CameraProps, 'device' | 'onInitialized' | 'onE
   cameraId: string
   enableFrameProcessor: boolean
   codeScannerOptions?: Omit<CodeScanner, 'onCodeScanned'>
-  onInitialized?: (event: NativeSyntheticEvent<void>) => void
+  onInitialized?: (event: NativeSyntheticEvent<OnInitializeEvent>) => void
   onError?: (event: NativeSyntheticEvent<OnErrorEvent>) => void
   onCodeScanned?: (event: NativeSyntheticEvent<OnCodeScannedEvent>) => void
   onViewReady: () => void
@@ -393,8 +396,8 @@ export class Camera extends React.PureComponent<CameraProps> {
     }
   }
 
-  private onInitialized(): void {
-    this.props.onInitialized?.()
+  private onInitialized(event: NativeSyntheticEvent<OnInitializeEvent>): void {
+    this.props.onInitialized?.(event.nativeEvent)
   }
   //#endregion
 

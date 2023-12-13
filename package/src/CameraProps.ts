@@ -1,7 +1,7 @@
 import type { ViewProps } from 'react-native'
 import type { CameraDevice, CameraDeviceFormat, VideoStabilizationMode } from './CameraDevice'
 import type { CameraRuntimeError } from './CameraError'
-import { CodeScanner } from './CodeScanner'
+import {CodeScanner, CodeScannerFrame} from './CodeScanner'
 import type { Frame } from './Frame'
 import type { Orientation } from './Orientation'
 
@@ -248,7 +248,7 @@ export interface CameraProps extends ViewProps {
   /**
    * Called when the camera was successfully initialized.
    */
-  onInitialized?: () => void
+  onInitialized?: (config: { codeScannerFrame: CodeScannerFrame }) => void
   /**
    * A worklet which will be called for every frame the Camera "sees".
    *

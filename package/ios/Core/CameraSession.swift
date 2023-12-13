@@ -34,8 +34,9 @@ class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVC
   var isRecording = false
   
   var prevScanMilsec = Date().timeIntervalSince1970 * 1000
+  // var codeScanArea: CGRect?
   
-  final let SCAN_INTERVAL_MILSEC: CGFloat = 300;
+  final let SCAN_INTERVAL_MILSEC: CGFloat = 200;
   
   // Callbacks
   weak var delegate: CameraSessionDelegate?
@@ -180,7 +181,12 @@ class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVC
 
         // Notify about Camera initialization
         if difference.inputChanged {
-          self.delegate?.onSessionInitialized()
+          guard let device = self.videoDeviceInput?.device else {
+            self.delegate?.onSessionInitialized(initializedConfig: InitializedConfig(codeScannerFrame: CodeScannerFrame(width: 0, height: 0)))
+            return
+          }
+          let size = device.activeFormat.videoDimensions
+          self.delegate?.onSessionInitialized(initializedConfig: InitializedConfig(codeScannerFrame: CodeScannerFrame(width: size.width, height: size.height)))
         }
       } catch {
         self.onConfigureError(error)
@@ -367,6 +373,19 @@ class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVC
       CameraQueues.cameraQueue.async {
         self.captureSession.startRunning()
       }
+    }
+  }
+  
+  struct InitializedConfig {
+    let codeScannerFrame: CodeScannerFrame
+
+    func toJSValue() -> [String: AnyHashable] {
+      return [
+        "codeScannerFrame": [
+          "width": codeScannerFrame.width,
+          "height": codeScannerFrame.height,
+        ],
+      ]
     }
   }
   
