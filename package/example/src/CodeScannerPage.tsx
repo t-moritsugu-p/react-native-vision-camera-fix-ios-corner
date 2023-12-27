@@ -112,9 +112,9 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
     // const codes: Code[] = srcCodes;
     // const frame: CodeScannerFrame = srcFrame;
 
-    console.log(codes[0]!.corners)
-    console.log(codes[0]!.value)
-    console.log(WINDOW_WIDTH + ' ' + WINDOW_HEIGHT)
+    // console.log(codes[0]!.corners)
+    // console.log(codes[0]!.value)
+    // console.log(WINDOW_WIDTH + ' ' + WINDOW_HEIGHT)
 
     // 入力画像のサイズはonInitializedと変わらないが、useStateでxRatioを利用する形にすると何故か常に初期値が利用されてしまう
     // そのため、毎回計算する。
@@ -125,13 +125,13 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
       // yRatio.value = frame.width / WINDOW_HEIGHT;
       const logicalHeight = frame.width / frame.height * WINDOW_WIDTH;
       yRatio = frame.width / logicalHeight;
-      console.log(logicalHeight + ' xr:' + xRatio + ' yr:' + yRatio)
+      // console.log(logicalHeight + ' xr:' + xRatio + ' yr:' + yRatio)
     } else {
       xRatio = frame.width / WINDOW_WIDTH;
       // yRatio.value = frame.height / WINDOW_HEIGHT;
       const logicalHeight = frame.height / frame.width * WINDOW_WIDTH;
       yRatio = frame.height / logicalHeight;
-      console.log(logicalHeight + ' xr:' + xRatio + ' yr:' + yRatio)
+      // console.log(logicalHeight + ' xr:' + xRatio + ' yr:' + yRatio)
     }
 
     const lists: BarcodeEx[] = [];
@@ -179,7 +179,7 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
 
   return (
     <View style={styles.container}>
-      {device != null && (
+      {device != null && isActive && (
         <Camera
           // style={StyleSheet.absoluteFill}
           style={[styles.barcodeArea, {height: cameraHeight}]}
@@ -222,11 +222,6 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
           )
         })
       )}
-
-
-
-
-
 
     </View>
   )
