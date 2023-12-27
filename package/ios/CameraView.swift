@@ -59,6 +59,8 @@ public final class CameraView: UIView, CameraSessionDelegate {
   // events
   @objc var onInitialized: RCTDirectEventBlock?
   @objc var onError: RCTDirectEventBlock?
+  @objc var onStarted: RCTDirectEventBlock?
+  @objc var onStopped: RCTDirectEventBlock?
   @objc var onViewReady: RCTDirectEventBlock?
   @objc var onCodeScanned: RCTDirectEventBlock?
   // zoom
@@ -285,6 +287,23 @@ public final class CameraView: UIView, CameraSessionDelegate {
     }
     // onInitialized([String: Any]())
     onInitialized(initializedConfig.toJSValue())
+
+  }
+
+  func onCameraStarted() {
+    ReactLogger.log(level: .info, message: "Camera started!")
+    guard let onStarted = onStarted else {
+      return
+    }
+    onStarted([:])
+  }
+
+  func onCameraStopped() {
+    ReactLogger.log(level: .info, message: "Camera stopped!")
+    guard let onStopped = onStopped else {
+      return
+    }
+    onStopped([:])
   }
 
   func onFrame(sampleBuffer: CMSampleBuffer) {

@@ -36,6 +36,8 @@ type NativeCameraViewProps = Omit<CameraProps, 'device' | 'onInitialized' | 'onE
   onInitialized?: (event: NativeSyntheticEvent<OnInitializeEvent>) => void
   onError?: (event: NativeSyntheticEvent<OnErrorEvent>) => void
   onCodeScanned?: (event: NativeSyntheticEvent<OnCodeScannedEvent>) => void
+  onStarted?: (event: NativeSyntheticEvent<void>) => void
+  onStopped?: (event: NativeSyntheticEvent<void>) => void
   onViewReady: () => void
 }
 type NativeRecordVideoOptions = Omit<RecordVideoOptions, 'onRecordingError' | 'onRecordingFinished' | 'videoBitRate'> & {
@@ -43,6 +45,9 @@ type NativeRecordVideoOptions = Omit<RecordVideoOptions, 'onRecordingError' | 'o
   videoBitRateMultiplier?: number
 }
 type RefType = React.Component<NativeCameraViewProps> & Readonly<NativeMethods>
+interface CameraState {
+  isRecordingWithFlash: boolean
+}
 //#endregion
 
 //#region Camera Component
@@ -74,7 +79,7 @@ type RefType = React.Component<NativeCameraViewProps> & Readonly<NativeMethods>
  *
  * @component
  */
-export class Camera extends React.PureComponent<CameraProps> {
+export class Camera extends React.PureComponent<CameraProps, CameraState> {
   /** @internal */
   static displayName = 'Camera'
   /** @internal */
@@ -89,10 +94,15 @@ export class Camera extends React.PureComponent<CameraProps> {
     super(props)
     this.onViewReady = this.onViewReady.bind(this)
     this.onInitialized = this.onInitialized.bind(this)
+    this.onStarted = this.onStarted.bind(this)
+    this.onStopped = this.onStopped.bind(this)
     this.onError = this.onError.bind(this)
     this.onCodeScanned = this.onCodeScanned.bind(this)
     this.ref = React.createRef<RefType>()
     this.lastFrameProcessor = undefined
+    this.state = {
+      isRecordingWithFlash: false,
+    }
   }
 
   private get handle(): number {
@@ -166,6 +176,13 @@ export class Camera extends React.PureComponent<CameraProps> {
     if (typeof onRecordingError !== 'function' || typeof onRecordingFinished !== 'function')
       throw new CameraRuntimeError('parameter/invalid-parameter', 'The onRecordingError or onRecordingFinished functions were not set!')
 
+    if (options.flash === 'on') {
+      // Enable torch for video recording
+      this.setState({
+        isRecordingWithFlash: true,
+      })
+    }
+
     const nativeOptions: NativeRecordVideoOptions = passThruOptions
     if (typeof videoBitRate === 'number') {
       // If the user passed an absolute number as a bit-rate, we just use this as a full override.
@@ -176,6 +193,13 @@ export class Camera extends React.PureComponent<CameraProps> {
     }
 
     const onRecordCallback = (video?: VideoFile, error?: CameraCaptureError): void => {
+      if (this.state.isRecordingWithFlash) {
+        // disable torch again if it was enabled
+        this.setState({
+          isRecordingWithFlash: false,
+        })
+      }
+
       if (error != null) return onRecordingError(error)
       if (video != null) return onRecordingFinished(video)
     }
@@ -324,30 +348,18 @@ export class Camera extends React.PureComponent<CameraProps> {
    * the user has permitted the app to use the camera.
    *
    * To actually prompt the user for camera permission, use {@linkcode Camera.requestCameraPermission | requestCameraPermission()}.
-   *
-   * @throws {@linkcode CameraRuntimeError} When any kind of error occured while getting the current permission status. Use the {@linkcode CameraRuntimeError.code | code} property to get the actual error
    */
-  public static async getCameraPermissionStatus(): Promise<CameraPermissionStatus> {
-    try {
-      return await CameraModule.getCameraPermissionStatus()
-    } catch (e) {
-      throw tryParseNativeCameraError(e)
-    }
+  public static getCameraPermissionStatus(): CameraPermissionStatus {
+    return CameraModule.getCameraPermissionStatus()
   }
   /**
    * Gets the current Microphone-Recording Permission Status. Check this before mounting the Camera to ensure
    * the user has permitted the app to use the microphone.
    *
    * To actually prompt the user for microphone permission, use {@linkcode Camera.requestMicrophonePermission | requestMicrophonePermission()}.
-   *
-   * @throws {@linkcode CameraRuntimeError} When any kind of error occured while getting the current permission status. Use the {@linkcode CameraRuntimeError.code | code} property to get the actual error
    */
-  public static async getMicrophonePermissionStatus(): Promise<CameraPermissionStatus> {
-    try {
-      return await CameraModule.getMicrophonePermissionStatus()
-    } catch (e) {
-      throw tryParseNativeCameraError(e)
-    }
+  public static getMicrophonePermissionStatus(): CameraPermissionStatus {
+    return CameraModule.getMicrophonePermissionStatus()
   }
   /**
    * Shows a "request permission" alert to the user, and resolves with the new camera permission status.
@@ -398,6 +410,14 @@ export class Camera extends React.PureComponent<CameraProps> {
 
   private onInitialized(event: NativeSyntheticEvent<OnInitializeEvent>): void {
     this.props.onInitialized?.(event.nativeEvent)
+  }
+
+  private onStarted(): void {
+    this.props.onStarted?.()
+  }
+
+  private onStopped(): void {
+    this.props.onStopped?.()
   }
   //#endregion
 
@@ -453,15 +473,19 @@ export class Camera extends React.PureComponent<CameraProps> {
     }
 
     const shouldEnableBufferCompression = props.video === true && frameProcessor == null
+    const torch = this.state.isRecordingWithFlash ? 'on' : props.torch
 
     return (
       <NativeCameraView
         {...props}
         cameraId={device.id}
         ref={this.ref}
+        torch={torch}
         onViewReady={this.onViewReady}
         onInitialized={this.onInitialized}
         onCodeScanned={this.onCodeScanned}
+        onStarted={this.onStarted}
+        onStopped={this.onStopped}
         onError={this.onError}
         codeScannerOptions={codeScanner}
         enableFrameProcessor={frameProcessor != null}

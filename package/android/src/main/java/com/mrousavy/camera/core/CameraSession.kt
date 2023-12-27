@@ -65,6 +65,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
 
   // Camera Configuration
   private var configuration: CameraConfiguration? = null
+  private var currentConfigureCall: Long = System.currentTimeMillis()
 
   // Camera State
   private var captureSession: CameraCaptureSession? = null
@@ -114,15 +115,26 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
     }
 
   suspend fun configure(lambda: (configuration: CameraConfiguration) -> Unit) {
+    // This is the latest call to configure()
+    val now = System.currentTimeMillis()
+    currentConfigureCall = now
+
+    Log.i(TAG, "Updating CameraSession Configuration...")
+
+    // Let caller configure a new configuration for the Camera.
+    val config = CameraConfiguration.copyOf(this.configuration)
+    lambda(config)
+    val diff = CameraConfiguration.difference(this.configuration, config)
+
+    if (!diff.hasAnyDifference) {
+      Log.w(TAG, "Called configure(...) but nothing changed...")
+      return
+    }
+
     mutex.withLock {
-      Log.i(TAG, "Updating CameraSession Configuration...")
-
-      val config = CameraConfiguration.copyOf(this.configuration)
-      lambda(config)
-      val diff = CameraConfiguration.difference(this.configuration, config)
-
-      if (!diff.hasAnyDifference) {
-        Log.w(TAG, "Called configure(...) but nothing changed...")
+      // Cancel configuration if there has already been a new config
+      if (currentConfigureCall != now) {
+        // configure() has been called again just now, skip this one so the new call takes over.
         return
       }
 
@@ -147,6 +159,16 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
         // Notify about Camera initialization
         if (diff.deviceChanged) {
           callback.onInitialized(this.codeScannerFrame)
+        }
+
+        // Notify about Camera start/stop
+        if (diff.isActiveChanged) {
+          // TODO: Move that into the CaptureRequest callback to get actual first-frame arrive time?
+          if (config.isActive) {
+            callback.onStarted()
+          } else {
+            callback.onStopped()
+          }
         }
       } catch (error: Throwable) {
         Log.e(TAG, "Failed to configure CameraSession! Error: ${error.message}, Config-Diff: $diff", error)
@@ -371,6 +393,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
       // TODO: Do we want to do stopRepeating() or entirely destroy the session?
       // If the Camera is not active, we don't do anything.
       captureSession?.stopRepeating()
+      isRunning = false
       return
     }
 
@@ -624,7 +647,12 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
 
   interface CameraSessionCallback {
     fun onError(error: Throwable)
+
     fun onInitialized(codeScannerFrame: Size?)
+
+    fun onStarted()
+    fun onStopped()
+
     fun onCodeScanned(codes: List<Barcode>, scannerFrame: CodeScannerFrame)
   }
 }

@@ -19,6 +19,7 @@ import MLKitVision
 class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
   // Configuration
   var configuration: CameraConfiguration?
+  var currentConfigureCall: DispatchTime = .now()
   // Capture Session
   let captureSession = AVCaptureSession()
   let audioCaptureSession = AVCaptureSession()
@@ -106,6 +107,10 @@ class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVC
    The `configuration` object is a copy of the currently active configuration that can be modified by the caller in the lambda.
    */
   func configure(_ lambda: (_ configuration: CameraConfiguration) throws -> Void) {
+    // This is the latest call to configure()
+    let time = DispatchTime.now()
+    currentConfigureCall = time
+
     ReactLogger.log(level: .info, message: "Updating Session Configuration...")
 
     // Let caller configure a new configuration for the Camera.
@@ -117,8 +122,14 @@ class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVC
     }
     let difference = CameraConfiguration.Difference(between: configuration, and: config)
 
-    // Set up Camera (Video) Capture Session (on camera queue)
+    // Set up Camera (Video) Capture Session (on camera queue, acts like a lock)
     CameraQueues.cameraQueue.async {
+      // Cancel configuration if there has already been a new config
+      guard self.currentConfigureCall == time else {
+        // configure() has been called again just now, skip this one so the new call takes over.
+        return
+      }
+
       do {
         // If needed, configure the AVCaptureSession (inputs, outputs)
         if difference.isSessionConfigurationDirty {
@@ -188,32 +199,32 @@ class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVC
           let size = device.activeFormat.videoDimensions
           self.delegate?.onSessionInitialized(initializedConfig: InitializedConfig(codeScannerFrame: CodeScannerFrame(width: size.width, height: size.height)))
         }
+
+        // After configuring, set this to the new configuration.
+        self.configuration = config
       } catch {
         self.onConfigureError(error)
       }
-    }
 
-    // Set up Audio Capture Session (on audio queue)
-    if difference.audioSessionChanged {
-      CameraQueues.audioQueue.async {
-        do {
-          // Lock Capture Session for configuration
-          ReactLogger.log(level: .info, message: "Beginning AudioSession configuration...")
-          self.audioCaptureSession.beginConfiguration()
+      // Set up Audio Capture Session (on audio queue)
+      if difference.audioSessionChanged {
+        CameraQueues.audioQueue.async {
+          do {
+            // Lock Capture Session for configuration
+            ReactLogger.log(level: .info, message: "Beginning AudioSession configuration...")
+            self.audioCaptureSession.beginConfiguration()
 
-          try self.configureAudioSession(configuration: config)
+            try self.configureAudioSession(configuration: config)
 
-          // Unlock Capture Session again and submit configuration to Hardware
-          self.audioCaptureSession.commitConfiguration()
-          ReactLogger.log(level: .info, message: "Committed AudioSession configuration!")
-        } catch {
-          self.onConfigureError(error)
+            // Unlock Capture Session again and submit configuration to Hardware
+            self.audioCaptureSession.commitConfiguration()
+            ReactLogger.log(level: .info, message: "Committed AudioSession configuration!")
+          } catch {
+            self.onConfigureError(error)
+          }
         }
       }
     }
-
-    // After configuring, set this to the new configuration.
-    configuration = config
   }
 
   /**
@@ -262,8 +273,10 @@ class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVC
     // Start/Stop session
     if configuration.isActive {
       captureSession.startRunning()
+      delegate?.onCameraStarted()
     } else {
       captureSession.stopRunning()
+      delegate?.onCameraStopped()
     }
   }
 

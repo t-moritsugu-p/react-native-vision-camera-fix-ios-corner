@@ -240,6 +240,14 @@ class CameraView(context: Context) :
     invokeOnInitialized(codeScannerFrame)
   }
 
+  override fun onStarted() {
+    invokeOnStarted()
+  }
+
+  override fun onStopped() {
+    invokeOnStopped()
+  }
+
   override fun onCodeScanned(codes: List<Barcode>, scannerFrame: CodeScannerFrame) {
     invokeOnCodeScanned(codes, scannerFrame)
   }

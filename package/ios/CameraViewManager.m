@@ -14,8 +14,8 @@
 @interface RCT_EXTERN_REMAP_MODULE (CameraView, CameraViewManager, RCTViewManager)
 
 // Module Functions
-RCT_EXTERN_METHOD(getCameraPermissionStatus : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject);
-RCT_EXTERN_METHOD(getMicrophonePermissionStatus : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject);
+RCT_EXTERN__BLOCKING_SYNCHRONOUS_METHOD(getCameraPermissionStatus);
+RCT_EXTERN__BLOCKING_SYNCHRONOUS_METHOD(getMicrophonePermissionStatus);
 RCT_EXTERN_METHOD(requestCameraPermission : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject);
 RCT_EXTERN_METHOD(requestMicrophonePermission : (RCTPromiseResolveBlock)resolve reject : (RCTPromiseRejectBlock)reject);
 
@@ -52,6 +52,8 @@ RCT_EXPORT_VIEW_PROPERTY(resizeMode, NSString);
 // Camera View Events
 RCT_EXPORT_VIEW_PROPERTY(onError, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onInitialized, RCTDirectEventBlock);
+RCT_EXPORT_VIEW_PROPERTY(onStarted, RCTDirectEventBlock);
+RCT_EXPORT_VIEW_PROPERTY(onStopped, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onViewReady, RCTDirectEventBlock);
 // Code Scanner
 RCT_EXPORT_VIEW_PROPERTY(codeScannerOptions, NSDictionary);

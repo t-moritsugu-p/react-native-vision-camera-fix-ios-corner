@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useCallback, useRef, useState } from 'react'
-import {Alert, AlertButton, Dimensions, Linking, Platform, StyleSheet, View} from 'react-native'
+import {Alert, AlertButton, Dimensions, Linking, Platform, StyleSheet, TouchableOpacity, View} from 'react-native'
 import {
   Code,
   CodeScannerFrame,
@@ -180,18 +180,40 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
   return (
     <View style={styles.container}>
       {device != null && isActive && (
-        <Camera
-          // style={StyleSheet.absoluteFill}
+
+        <TouchableOpacity
+          // style={[styles.barcodeAreaWrapper, {height: cameraHeight.value}]}
           style={[styles.barcodeArea, {height: cameraHeight}]}
-          device={device}
-          isActive={isActive}
-          codeScanner={codeScanner}
-          torch={torch ? 'on' : 'off'}
-          enableZoomGesture={true}
-          onInitialized={onCameraInit}
-          ref={refCamera}
-          fps={6}
-        />
+          onPressOut={async (e) => {
+            if (refCamera) {
+              try {
+                console.log('focust st')
+                console.log(e.nativeEvent.locationX + ' '  + e.nativeEvent.locationY)
+                await refCamera.current?.focus({x: e.nativeEvent.locationX, y: e.nativeEvent.locationY});
+                console.log('focust end')
+              } catch (e) {
+                console.log(e)
+                console.log('focust error')
+              }
+
+            }
+          }}
+        >
+
+          <Camera
+            // style={StyleSheet.absoluteFill}
+            style={[styles.barcodeArea, {height: cameraHeight}]}
+            device={device}
+            isActive={isActive}
+            codeScanner={codeScanner}
+            torch={torch ? 'on' : 'off'}
+            // enableZoomGesture={true}
+            onInitialized={onCameraInit}
+            ref={refCamera}
+            fps={6}
+          />
+
+        </TouchableOpacity>
       )}
 
       <StatusBarBlurBackground />
