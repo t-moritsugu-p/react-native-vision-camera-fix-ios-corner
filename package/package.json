@@ -1,7 +1,7 @@
 {
 
   "name": "@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "A powerful, high-performance React Native Camera library.",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",

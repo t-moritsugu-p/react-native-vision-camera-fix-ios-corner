@@ -10,6 +10,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.mrousavy.camera.types.Orientation
 import java.io.Closeable
 
+private const val SCAN_INTERVAL_MILSEC = 200
 class CodeScannerPipeline(
   val size: Size,
   val format: Int,
@@ -25,6 +26,8 @@ class CodeScannerPipeline(
 
   private val imageReader: ImageReader
   private val scanner: BarcodeScanner
+
+  private var prevScanMilsec: Long? = null
 
   val surface: Surface
     get() = imageReader.surface
@@ -48,6 +51,14 @@ class CodeScannerPipeline(
         return@setOnImageAvailableListener
       }
 
+      // SCAN_INTERVAL_MILSECに制限
+      val now = System.currentTimeMillis()
+      if (prevScanMilsec != null && now - (prevScanMilsec as Long) < SCAN_INTERVAL_MILSEC) {
+        image.close()
+        return@setOnImageAvailableListener
+      }
+      prevScanMilsec = now
+
       isBusy = true
       // TODO: Get correct orientation
       val inputImage = InputImage.fromMediaImage(image, Orientation.PORTRAIT.toDegrees())
@@ -64,6 +75,7 @@ class CodeScannerPipeline(
           image.close()
           isBusy = false
         }
+
     }, CameraQueues.videoQueue.handler)
   }
 
