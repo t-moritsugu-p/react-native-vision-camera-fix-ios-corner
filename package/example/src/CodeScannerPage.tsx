@@ -112,9 +112,9 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
     // const codes: Code[] = srcCodes;
     // const frame: CodeScannerFrame = srcFrame;
 
-    // console.log(codes[0]!.corners)
-    // console.log(codes[0]!.value)
-    // console.log(WINDOW_WIDTH + ' ' + WINDOW_HEIGHT)
+    console.log(codes[0]!.corners)
+    console.log(codes[0]!.value)
+    console.log(WINDOW_WIDTH + ' ' + WINDOW_HEIGHT)
 
     // 入力画像のサイズはonInitializedと変わらないが、useStateでxRatioを利用する形にすると何故か常に初期値が利用されてしまう
     // そのため、毎回計算する。
@@ -179,7 +179,7 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
 
   return (
     <View style={styles.container}>
-      {device != null && isActive && (
+      {device != null && isFocused && (
 
         <TouchableOpacity
           // style={[styles.barcodeAreaWrapper, {height: cameraHeight.value}]}
