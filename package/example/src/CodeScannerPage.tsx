@@ -4,7 +4,7 @@ import {Alert, AlertButton, Dimensions, Linking, Platform, StyleSheet, Touchable
 import {
   Code,
   CodeScannerFrame,
-  useCameraDevice,
+  useCameraDevice, useCameraFormat,
   useCodeScanner
 } from '@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner'
 import { Camera } from '@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner'
@@ -50,6 +50,8 @@ type Props = NativeStackScreenProps<Routes, 'CodeScannerPage'>
 export function CodeScannerPage({ navigation }: Props): React.ReactElement {
   // 1. Use a simple default back camera
   const device = useCameraDevice('back')
+  // 3.7.0からfps指定の場合formatが必須になったので取得して割り当てる必要がある
+  const format = useCameraFormat(device, [])
 
   // 2. Only activate Camera when the app is focused and this screen is currently opened
   const isFocused = useIsFocused()
@@ -211,6 +213,7 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
             onInitialized={onCameraInit}
             ref={refCamera}
             fps={6}
+            format={format}
           />
 
         </TouchableOpacity>
