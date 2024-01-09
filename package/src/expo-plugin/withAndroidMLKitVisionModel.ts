@@ -1,17 +1,24 @@
-import { AndroidConfig, ConfigPlugin, withAndroidManifest } from '@expo/config-plugins'
+import { ConfigPlugin, withGradleProperties } from '@expo/config-plugins'
+import { ConfigProps } from './@types'
 
-const { addMetaDataItemToMainApplication, getMainApplicationOrThrow } = AndroidConfig.Manifest
+/**
+ * Set the `VisionCamera_enableCodeScanner` value in the static `gradle.properties` file.
+ * This is used to add the full MLKit dependency to the project.
+ */
+export const withAndroidMLKitVisionModel: ConfigPlugin<ConfigProps> = (c) => {
+  const key = 'VisionCamera_enableCodeScanner'
+  return withGradleProperties(c, (config) => {
+    config.modResults = config.modResults.filter((item) => {
+      if (item.type === 'property' && item.key === key) return false
+      return true
+    })
 
-export const withAndroidMLKitVisionModel: ConfigPlugin = (config) => {
-  return withAndroidManifest(config, (conf) => {
-    const androidManifest = conf.modResults
+    config.modResults.push({
+      type: 'property',
+      key: key,
+      value: 'true',
+    })
 
-    const mainApplication = getMainApplicationOrThrow(androidManifest)
-
-    addMetaDataItemToMainApplication(mainApplication, 'com.google.mlkit.vision.DEPENDENCIES', 'barcode')
-
-    conf.modResults = androidManifest
-
-    return conf
+    return config
   })
 }

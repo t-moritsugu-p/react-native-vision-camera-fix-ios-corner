@@ -31,30 +31,36 @@ FrameHostObject::~FrameHostObject() {
 
 std::vector<jsi::PropNameID> FrameHostObject::getPropertyNames(jsi::Runtime& rt) {
   std::vector<jsi::PropNameID> result;
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("width")));
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("height")));
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("bytesPerRow")));
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("planesCount")));
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("orientation")));
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("isMirrored")));
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("timestamp")));
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("pixelFormat")));
-  // Conversion
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("toString")));
-  result.push_back(jsi::PropNameID::forUtf8(rt, std::string("toArrayBuffer")));
   // Ref Management
   result.push_back(jsi::PropNameID::forUtf8(rt, std::string("isValid")));
   result.push_back(jsi::PropNameID::forUtf8(rt, std::string("incrementRefCount")));
   result.push_back(jsi::PropNameID::forUtf8(rt, std::string("decrementRefCount")));
+
+  if (frame != nullptr && frame->getIsValid()) {
+    // Frame Properties
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("width")));
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("height")));
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("bytesPerRow")));
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("planesCount")));
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("orientation")));
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("isMirrored")));
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("timestamp")));
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("pixelFormat")));
+    // Conversion
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("toString")));
+    result.push_back(jsi::PropNameID::forUtf8(rt, std::string("toArrayBuffer")));
+  }
+
   return result;
 }
+
+#define JSI_FUNC [=](jsi::Runtime & runtime, const jsi::Value& thisValue, const jsi::Value* arguments, size_t count) -> jsi::Value
 
 jsi::Value FrameHostObject::get(jsi::Runtime& runtime, const jsi::PropNameID& propName) {
   auto name = propName.utf8(runtime);
 
   if (name == "incrementRefCount") {
-    jsi::HostFunctionType incrementRefCount = [=](jsi::Runtime& runtime, const jsi::Value& thisArg, const jsi::Value* args,
-                                                  size_t count) -> jsi::Value {
+    jsi::HostFunctionType incrementRefCount = JSI_FUNC {
       // Increment retain count by one.
       this->frame->incrementRefCount();
       return jsi::Value::undefined();
@@ -62,7 +68,7 @@ jsi::Value FrameHostObject::get(jsi::Runtime& runtime, const jsi::PropNameID& pr
     return jsi::Function::createFromHostFunction(runtime, jsi::PropNameID::forUtf8(runtime, "incrementRefCount"), 0, incrementRefCount);
   }
   if (name == "decrementRefCount") {
-    auto decrementRefCount = [=](jsi::Runtime& runtime, const jsi::Value& thisArg, const jsi::Value* args, size_t count) -> jsi::Value {
+    auto decrementRefCount = JSI_FUNC {
       // Decrement retain count by one. If the retain count is zero, the Frame gets closed.
       this->frame->decrementRefCount();
       return jsi::Value::undefined();
@@ -70,21 +76,21 @@ jsi::Value FrameHostObject::get(jsi::Runtime& runtime, const jsi::PropNameID& pr
     return jsi::Function::createFromHostFunction(runtime, jsi::PropNameID::forUtf8(runtime, "decrementRefCount"), 0, decrementRefCount);
   }
   if (name == "toString") {
-    jsi::HostFunctionType toString = [=](jsi::Runtime& runtime, const jsi::Value& thisArg, const jsi::Value* args,
-                                         size_t count) -> jsi::Value {
+    jsi::HostFunctionType toString = JSI_FUNC {
       if (!this->frame) {
         return jsi::String::createFromUtf8(runtime, "[closed frame]");
       }
       auto width = this->frame->getWidth();
       auto height = this->frame->getHeight();
-      auto str = std::to_string(width) + " x " + std::to_string(height) + " Frame";
+      auto format = this->frame->getPixelFormat();
+      auto formatString = format->getUnionValue();
+      auto str = std::to_string(width) + " x " + std::to_string(height) + " " + formatString->toString() + " Frame";
       return jsi::String::createFromUtf8(runtime, str);
     };
     return jsi::Function::createFromHostFunction(runtime, jsi::PropNameID::forUtf8(runtime, "toString"), 0, toString);
   }
   if (name == "toArrayBuffer") {
-    jsi::HostFunctionType toArrayBuffer = [=](jsi::Runtime& runtime, const jsi::Value& thisArg, const jsi::Value* args,
-                                              size_t count) -> jsi::Value {
+    jsi::HostFunctionType toArrayBuffer = JSI_FUNC {
 #if __ANDROID_API__ >= 26
       AHardwareBuffer* hardwareBuffer = this->frame->getHardwareBuffer();
 
@@ -141,11 +147,13 @@ jsi::Value FrameHostObject::get(jsi::Runtime& runtime, const jsi::PropNameID& pr
     return jsi::Value(this->frame->getIsMirrored());
   }
   if (name == "orientation") {
-    auto string = this->frame->getOrientation();
+    auto orientation = this->frame->getOrientation();
+    auto string = orientation->getUnionValue();
     return jsi::String::createFromUtf8(runtime, string->toStdString());
   }
   if (name == "pixelFormat") {
-    auto string = this->frame->getPixelFormat();
+    auto pixelFormat = this->frame->getPixelFormat();
+    auto string = pixelFormat->getUnionValue();
     return jsi::String::createFromUtf8(runtime, string->toStdString());
   }
   if (name == "timestamp") {

@@ -1,6 +1,7 @@
 package com.mrousavy.camera.core
 
 import com.mrousavy.camera.types.CameraDeviceError
+import com.mrousavy.camera.types.VideoStabilizationMode
 
 abstract class CameraError(
   /**
@@ -49,15 +50,49 @@ class NoCameraDeviceError :
   )
 class PixelFormatNotSupportedError(format: String) :
   CameraError("device", "pixel-format-not-supported", "The pixelFormat $format is not supported on the given Camera Device!")
+class LowLightBoostNotSupportedError :
+  CameraError(
+    "device",
+    "low-light-boost-not-supported",
+    "The currently selected camera device does not support low-light boost! Select a device where `device.supportsLowLightBoost` is true."
+  )
+class FlashUnavailableError :
+  CameraError(
+    "device",
+    "flash-unavailable",
+    "The Camera Device does not have a flash unit! Make sure you select a device where `device.hasFlash`/`device.hasTorch` is true."
+  )
 
 class CameraNotReadyError :
   CameraError("session", "camera-not-ready", "The Camera is not ready yet! Wait for the onInitialized() callback!")
 class CameraCannotBeOpenedError(cameraId: String, error: CameraDeviceError) :
   CameraError("session", "camera-cannot-be-opened", "The given Camera device (id: $cameraId) could not be opened! Error: $error")
 class CameraSessionCannotBeConfiguredError(cameraId: String) :
-  CameraError("session", "cannot-create-session", "Failed to create a Camera Session for Camera $cameraId!")
+  CameraError("session", "cannot-create-session", "Failed to create a Camera Session for Camera #$cameraId!")
 class CameraDisconnectedError(cameraId: String, error: CameraDeviceError) :
   CameraError("session", "camera-has-been-disconnected", "The given Camera device (id: $cameraId) has been disconnected! Error: $error")
+
+class PropRequiresFormatToBeNonNullError(propName: String) :
+  CameraError("format", "format-required", "The prop \"$propName\" requires a format to be set, but format was null!")
+class InvalidFpsError(fps: Int) :
+  CameraError(
+    "format",
+    "invalid-fps",
+    "The given format cannot run at $fps FPS! Make sure your FPS is lower than `format.maxFps` but higher than `format.minFps`."
+  )
+class InvalidVideoStabilizationMode(mode: VideoStabilizationMode) :
+  CameraError(
+    "format",
+    "invalid-video-stabilization-mode",
+    "The given format does not support the videoStabilizationMode \"${mode.unionValue}\"! " +
+      "Select a format that contains ${mode.unionValue} in `format.supportedVideoStabilizationModes`."
+  )
+class InvalidVideoHdrError :
+  CameraError(
+    "format",
+    "invalid-video-hdr",
+    "The given format does not support videoHdr! Select a format where `format.supportsVideoHdr` is true."
+  )
 
 class VideoNotEnabledError :
   CameraError("capture", "video-not-enabled", "Video capture is disabled! Pass `video={true}` to enable video recordings.")
@@ -87,8 +122,6 @@ class CodeTypeNotSupportedError(codeType: String) :
 
 class ViewNotFoundError(viewId: Int) :
   CameraError("system", "view-not-found", "The given view (ID $viewId) was not found in the view manager.")
-class FrameProcessorsUnavailableError(reason: String) :
-  CameraError("system", "frame-processors-unavailable", "Frame Processors are unavailable! Reason: $reason")
 class HardwareBuffersNotAvailableError :
   CameraError("system", "hardware-buffers-unavailable", "HardwareBuffers are only available on API 28 or higher!")
 
