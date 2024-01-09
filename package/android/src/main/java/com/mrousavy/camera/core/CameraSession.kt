@@ -189,7 +189,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
         this.configuration = config
 
         // Notify about Camera initialization
-        if (diff.deviceChanged && config.isActive) {
+        if (diff.deviceChanged) {
           callback.onInitialized(this.codeScannerFrame)
         }
       } catch (error: Throwable) {
