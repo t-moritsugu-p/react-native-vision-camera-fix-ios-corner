@@ -15,6 +15,7 @@ import com.mrousavy.camera.core.CameraSession
 import com.mrousavy.camera.core.CodeScannerFrame
 import com.mrousavy.camera.core.PreviewView
 import com.mrousavy.camera.extensions.installHierarchyFitter
+import com.mrousavy.camera.frameprocessor.Frame
 import com.mrousavy.camera.frameprocessor.FrameProcessor
 import com.mrousavy.camera.types.CameraDeviceFormat
 import com.mrousavy.camera.types.CodeScannerOptions
@@ -23,7 +24,6 @@ import com.mrousavy.camera.types.PixelFormat
 import com.mrousavy.camera.types.ResizeMode
 import com.mrousavy.camera.types.Torch
 import com.mrousavy.camera.types.VideoStabilizationMode
-import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -39,8 +39,7 @@ import kotlinx.coroutines.launch
 @SuppressLint("ClickableViewAccessibility", "ViewConstructor", "MissingPermission")
 class CameraView(context: Context) :
   FrameLayout(context),
-  CoroutineScope,
-  CameraSession.CameraSessionCallback {
+  CameraSession.Callback {
   companion object {
     const val TAG = "CameraView"
   }
@@ -83,26 +82,28 @@ class CameraView(context: Context) :
       previewView.resizeMode = value
       field = value
     }
+  var enableFpsGraph: Boolean = false
+    set(value) {
+      field = value
+      updateFpsGraph()
+    }
 
   // code scanner
   var codeScannerOptions: CodeScannerOptions? = null
 
   // private properties
   private var isMounted = false
+  private val coroutineScope = CoroutineScope(CameraQueues.cameraQueue.coroutineDispatcher)
   internal val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
   // session
   internal val cameraSession: CameraSession
   private val previewView: PreviewView
   private var currentConfigureCall: Long = System.currentTimeMillis()
-
   internal var frameProcessor: FrameProcessor? = null
-    set(value) {
-      field = value
-      cameraSession.frameProcessor = frameProcessor
-    }
 
-  override val coroutineContext: CoroutineContext = CameraQueues.cameraQueue.coroutineDispatcher
+  // other
+  private var fpsGraph: FpsGraphView? = null
 
   init {
     this.installHierarchyFitter()
@@ -113,17 +114,17 @@ class CameraView(context: Context) :
   }
 
   override fun onAttachedToWindow() {
+    super.onAttachedToWindow()
     if (!isMounted) {
       isMounted = true
       invokeOnViewReady()
     }
     update()
-    super.onAttachedToWindow()
   }
 
   override fun onDetachedFromWindow() {
-    update()
     super.onDetachedFromWindow()
+    update()
   }
 
   fun destroy() {
@@ -135,7 +136,7 @@ class CameraView(context: Context) :
     val now = System.currentTimeMillis()
     currentConfigureCall = now
 
-    launch {
+    coroutineScope.launch {
       cameraSession.configure { config ->
         if (currentConfigureCall != now) {
           // configure waits for a lock, and if a new call to update() happens in the meantime we can drop this one.
@@ -229,6 +230,24 @@ class CameraView(context: Context) :
     } else {
       setOnTouchListener(null)
     }
+  }
+
+  private fun updateFpsGraph() {
+    if (enableFpsGraph) {
+      if (fpsGraph != null) return
+      fpsGraph = FpsGraphView(context)
+      addView(fpsGraph)
+    } else {
+      if (fpsGraph == null) return
+      removeView(fpsGraph)
+      fpsGraph = null
+    }
+  }
+
+  override fun onFrame(frame: Frame) {
+    frameProcessor?.call(frame)
+
+    fpsGraph?.onTick()
   }
 
   override fun onError(error: Throwable) {

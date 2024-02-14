@@ -212,8 +212,8 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
             // enableZoomGesture={true}
             onInitialized={onCameraInit}
             ref={refCamera}
-            fps={6}
-            format={format}
+            //fps={6}
+            //format={format}
           />
 
         </TouchableOpacity>

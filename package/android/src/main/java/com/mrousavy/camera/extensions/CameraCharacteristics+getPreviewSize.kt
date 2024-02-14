@@ -4,7 +4,6 @@ import android.content.res.Resources
 import android.hardware.camera2.CameraCharacteristics
 import android.util.Size
 import android.view.SurfaceHolder
-import kotlin.math.abs
 
 fun getMaximumPreviewSize(): Size {
   // See https://developer.android.com/reference/android/hardware/camera2/params/StreamConfigurationMap
@@ -20,28 +19,11 @@ fun getMaximumPreviewSize(): Size {
   return if (isHighResScreen) display1080p else displaySize
 }
 
-fun CameraCharacteristics.getPreviewSizeFromAspectRatio(aspectRatio: Double): Size {
+fun CameraCharacteristics.getPreviewTargetSize(targetSize: Size?): Size {
   val config = this.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
   val maximumPreviewSize = getMaximumPreviewSize()
   val outputSizes = config.getOutputSizes(SurfaceHolder::class.java)
-    .sortedByDescending { it.width * it.height }
-    .sortedBy { abs(aspectRatio - (it.bigger.toDouble() / it.smaller)) }
+    .filter { it.bigger <= maximumPreviewSize.bigger && it.smaller <= maximumPreviewSize.smaller }
 
-  return outputSizes.first { it.bigger <= maximumPreviewSize.bigger && it.smaller <= maximumPreviewSize.smaller }
+  return outputSizes.closestToOrMax(targetSize)
 }
-
-fun CameraCharacteristics.getAutomaticPreviewSize(): Size {
-  val config = this.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)!!
-  val maximumPreviewSize = getMaximumPreviewSize()
-  val outputSizes = config.getOutputSizes(SurfaceHolder::class.java)
-    .sortedByDescending { it.width * it.height }
-
-  return outputSizes.first { it.bigger <= maximumPreviewSize.bigger && it.smaller <= maximumPreviewSize.smaller }
-}
-
-fun CameraCharacteristics.getPreviewTargetSize(aspectRatio: Double?): Size =
-  if (aspectRatio != null) {
-    getPreviewSizeFromAspectRatio(aspectRatio)
-  } else {
-    getAutomaticPreviewSize()
-  }

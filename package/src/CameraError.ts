@@ -25,6 +25,7 @@ export type SessionError =
   | 'session/camera-cannot-be-opened'
   | 'session/camera-has-been-disconnected'
   | 'session/audio-in-use-by-other-app'
+  | 'session/no-outputs'
   | 'session/audio-session-failed-to-activate'
 export type CodeScannerError =
   | 'code-scanner/not-compatible-with-outputs'
@@ -36,9 +37,11 @@ export type CaptureError =
   | 'capture/file-io-error'
   | 'capture/create-temp-file-error'
   | 'capture/create-recorder-error'
+  | 'capture/insufficient-storage'
   | 'capture/recorder-error'
   | 'capture/video-not-enabled'
   | 'capture/photo-not-enabled'
+  | 'capture/frame-invalid'
   | 'capture/aborted'
   | 'capture/unknown'
 export type SystemError =

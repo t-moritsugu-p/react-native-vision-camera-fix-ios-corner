@@ -15,6 +15,7 @@
 
 #include "FrameHostObject.h"
 #include "JFrame.h"
+#include "JSharedArray.h"
 
 namespace vision {
 
@@ -56,8 +57,24 @@ jni::local_ref<jobject> JSIJNIConversion::convertJSIValueToJNIObject(jsi::Runtim
         arrayList->add(jniItem);
       }
       return arrayList;
+    } else if (valueAsObject.isArrayBuffer(runtime)) {
+      // ArrayBuffer/TypedArray
+
+      jsi::ArrayBuffer arrayBuffer = valueAsObject.getArrayBuffer(runtime);
+      return JSharedArray::create(runtime, std::move(arrayBuffer));
+
     } else if (valueAsObject.isHostObject(runtime)) {
-      throw std::runtime_error("You can't pass HostObjects here.");
+
+      if (valueAsObject.isHostObject<FrameHostObject>(runtime)) {
+        // Frame
+
+        auto frame = valueAsObject.getHostObject<FrameHostObject>(runtime);
+        return jni::make_local(frame->frame);
+
+      } else {
+        throw std::runtime_error("The given HostObject is not supported by a Frame Processor Plugin.");
+      }
+
     } else {
       // Map<String, Object>
 
@@ -75,7 +92,7 @@ jni::local_ref<jobject> JSIJNIConversion::convertJSIValueToJNIObject(jsi::Runtim
     }
   } else {
     auto stringRepresentation = value.toString(runtime).utf8(runtime);
-    throw std::runtime_error("Failed to convert jsi::Value to JNI value - unsupported type!" + stringRepresentation);
+    throw std::runtime_error("Failed to convert jsi::Value to JNI value - unsupported type! " + stringRepresentation);
   }
 }
 
@@ -154,6 +171,12 @@ jsi::Value JSIJNIConversion::convertJNIObjectToJSIValue(jsi::Runtime& runtime, c
     // box into HostObject
     auto hostObject = std::make_shared<FrameHostObject>(frame);
     return jsi::Object::createFromHostObject(runtime, hostObject);
+  } else if (object->isInstanceOf(JSharedArray::javaClassStatic())) {
+    // SharedArray
+    auto sharedArray = static_ref_cast<JSharedArray::javaobject>(object);
+
+    std::shared_ptr<jsi::ArrayBuffer> array = sharedArray->cthis()->getArrayBuffer();
+    return array->getArrayBuffer(runtime);
   }
 
   auto type = object->getClass()->toString();

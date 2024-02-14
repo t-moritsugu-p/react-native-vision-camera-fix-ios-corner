@@ -19,7 +19,7 @@ iOS Frame Processor Plugins can be written in either **Objective-C** or **Swift*
 Run [Vision Camera Plugin Builder CLI](https://github.com/mateusz1913/vision-camera-plugin-builder),
 
 ```sh
-npx vision-camera-plugin-builder ios
+npx vision-camera-plugin-builder@latest ios
 ```
 
 :::info
@@ -51,8 +51,9 @@ For reference see the [CLI's docs](https://github.com/mateusz1913/vision-camera-
 
 @implementation FaceDetectorFrameProcessorPlugin
 
-- (instancetype) initWithOptions:(NSDictionary* _Nullable)options; {
-  self = [super initWithOptions:options];
+- (instancetype) initWithProxy:(VisionCameraProxyHolder*)proxy
+                   withOptions:(NSDictionary* _Nullable)options {
+  self = [super initWithProxy:proxy options:options];
   return self;
 }
 
@@ -91,8 +92,8 @@ import VisionCamera
 
 @objc(FaceDetectorFrameProcessorPlugin)
 public class FaceDetectorFrameProcessorPlugin: FrameProcessorPlugin {
-  public override init(options: [AnyHashable : Any]! = [:]) {
-    super.init(options: options)
+  public override init(proxy: VisionCameraProxyHolder, options: [AnyHashable : Any]! = [:]) {
+    super.init(proxy: proxy, options: options)
   }
 
   public override func callback(_ frame: Frame, withArguments arguments: [AnyHashable : Any]?) -> Any {
