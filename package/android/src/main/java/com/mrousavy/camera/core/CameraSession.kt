@@ -23,9 +23,6 @@ import com.mrousavy.camera.core.outputs.PhotoOutput
 import com.mrousavy.camera.core.outputs.SurfaceOutput
 import com.mrousavy.camera.core.outputs.VideoPipelineOutput
 import com.mrousavy.camera.extensions.closestToOrMax
-import com.mrousavy.camera.extensions.getPhotoSizes
-import com.mrousavy.camera.extensions.getPreviewTargetSize
-import com.mrousavy.camera.extensions.getVideoSizes
 import com.mrousavy.camera.frameprocessor.Frame
 import com.mrousavy.camera.types.Flash
 import com.mrousavy.camera.types.LensFacing
@@ -249,20 +246,20 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
     codeScannerOutput = null
     isRunning = false
 
-    val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+    val deviceDetails = CameraDeviceDetails(cameraManager, cameraId)
     val format = configuration.format
 
     Log.i(TAG, "Creating outputs for Camera #$cameraId...")
 
-    val isSelfie = characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+    val isSelfie = deviceDetails.lensFacing == LensFacing.FRONT
 
     val outputs = mutableListOf<SurfaceOutput>()
 
     // Photo Output
     val photo = configuration.photo as? CameraConfiguration.Output.Enabled<CameraConfiguration.Photo>
     if (photo != null) {
-      val imageFormat = ImageFormat.JPEG
-      val sizes = characteristics.getPhotoSizes(imageFormat)
+      val imageFormat = deviceDetails.photoFormat
+      val sizes = deviceDetails.getPhotoSizes()
       val size = sizes.closestToOrMax(format?.photoSize)
       val maxImages = 10
 
@@ -282,7 +279,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
     val video = configuration.video as? CameraConfiguration.Output.Enabled<CameraConfiguration.Video>
     if (video != null) {
       val imageFormat = video.config.pixelFormat.toImageFormat()
-      val sizes = characteristics.getVideoSizes(cameraId, imageFormat)
+      val sizes = deviceDetails.getVideoSizes(imageFormat)
       val size = sizes.closestToOrMax(format?.videoSize)
 
       Log.i(TAG, "Adding ${size.width}x${size.height} Video Output in ${ImageFormatUtils.imageFormatToString(imageFormat)}...")
@@ -292,6 +289,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
         video.config.pixelFormat,
         isSelfie,
         video.config.enableFrameProcessor,
+        video.config.enableGpuBuffers,
         callback
       )
       val output = VideoPipelineOutput(videoPipeline, video.config.enableHdr)
@@ -304,7 +302,8 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
     if (preview != null) {
       // Compute Preview Size based on chosen video size
       val videoSize = videoOutput?.size ?: format?.videoSize
-      val size = characteristics.getPreviewTargetSize(videoSize)
+      val sizes = deviceDetails.getPreviewSizes()
+      val size = sizes.closestToOrMax(videoSize)
 
       val enableHdr = video?.config?.enableHdr ?: false
 
@@ -317,7 +316,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
       )
       outputs.add(output)
       // Size is usually landscape, so we flip it here
-      previewView?.setSurfaceSize(size.width, size.height)
+      previewView?.setSurfaceSize(size.width, size.height, deviceDetails.sensorOrientation)
     }
 
     // CodeScanner Output
@@ -330,7 +329,7 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
       }
 
       val imageFormat = ImageFormat.YUV_420_888
-      val sizes = characteristics.getVideoSizes(cameraId, imageFormat)
+      val sizes = deviceDetails.getVideoSizes(imageFormat)
       val size = sizes.closestToOrMax(Size(1280, 720))
 
       this.codeScannerFrame = Size(size.width, size.height);
@@ -375,8 +374,8 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
     qualityPrioritization: QualityPrioritization,
     flash: Flash,
     enableShutterSound: Boolean,
-    enableRedEyeReduction: Boolean,
     enableAutoStabilization: Boolean,
+    enablePrecapture: Boolean,
     outputOrientation: Orientation
   ): CapturedPhoto {
     val photoOutput = photoOutput ?: throw PhotoNotEnabledError()
@@ -385,11 +384,11 @@ class CameraSession(private val context: Context, private val cameraManager: Cam
     val result = captureSession.capture(
       qualityPrioritization,
       flash,
-      enableRedEyeReduction,
       enableAutoStabilization,
       photoOutput.enableHdr,
       outputOrientation,
-      enableShutterSound
+      enableShutterSound,
+      enablePrecapture
     )
 
     try {

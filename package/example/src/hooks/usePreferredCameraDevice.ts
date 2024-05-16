@@ -1,7 +1,6 @@
 import { useMMKVString } from 'react-native-mmkv'
-import { CameraDevice } from '../../../src/CameraDevice'
 import { useCallback, useMemo } from 'react'
-import { useCameraDevices } from '../../../src/hooks/useCameraDevices'
+import { CameraDevice, useCameraDevices } from '@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner'
 
 export function usePreferredCameraDevice(): [CameraDevice | undefined, (device: CameraDevice) => void] {
   const [preferredDeviceId, setPreferredDeviceId] = useMMKVString('camera.preferredDeviceId')

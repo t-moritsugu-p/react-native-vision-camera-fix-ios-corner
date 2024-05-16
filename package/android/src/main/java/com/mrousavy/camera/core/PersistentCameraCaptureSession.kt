@@ -7,25 +7,26 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.TotalCaptureResult
-import android.hardware.camera2.params.MeteringRectangle
 import android.util.Log
-import android.util.Size
 import com.mrousavy.camera.core.capture.PhotoCaptureRequest
 import com.mrousavy.camera.core.capture.RepeatingCaptureRequest
 import com.mrousavy.camera.core.outputs.SurfaceOutput
+import com.mrousavy.camera.extensions.PrecaptureOptions
+import com.mrousavy.camera.extensions.PrecaptureTrigger
 import com.mrousavy.camera.extensions.capture
 import com.mrousavy.camera.extensions.createCaptureSession
 import com.mrousavy.camera.extensions.isValid
 import com.mrousavy.camera.extensions.openCamera
-import com.mrousavy.camera.extensions.setRepeatingRequestAndWaitForAF
+import com.mrousavy.camera.extensions.precapture
 import com.mrousavy.camera.extensions.tryAbortCaptures
+import com.mrousavy.camera.extensions.tryStopRepeating
 import com.mrousavy.camera.types.Flash
 import com.mrousavy.camera.types.Orientation
 import com.mrousavy.camera.types.QualityPrioritization
 import java.io.Closeable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -40,8 +41,8 @@ import kotlinx.coroutines.sync.withLock
 class PersistentCameraCaptureSession(private val cameraManager: CameraManager, private val callback: Callback) : Closeable {
   companion object {
     private const val TAG = "PersistentCameraCaptureSession"
-    private val DEFAULT_METERING_SIZE = Size(100, 100)
     private const val FOCUS_RESET_TIMEOUT = 3000L
+    private const val PRECAPTURE_LOCK_TIMEOUT = 5000L
   }
 
   // Inputs/Dependencies
@@ -57,13 +58,14 @@ class PersistentCameraCaptureSession(private val cameraManager: CameraManager, p
 
   private val mutex = Mutex()
   private var didDestroyFromOutside = false
-  private var focusResetJob: Job? = null
+  private var focusJob: Job? = null
   private val coroutineScope = CoroutineScope(CameraQueues.cameraQueue.coroutineDispatcher)
 
   val isRunning: Boolean
     get() = isActive && session != null && device != null && !didDestroyFromOutside
 
   override fun close() {
+    focusJob?.cancel()
     session?.tryAbortCaptures()
     device?.close()
   }
@@ -75,6 +77,10 @@ class PersistentCameraCaptureSession(private val cameraManager: CameraManager, p
   }
 
   suspend fun withConfiguration(block: suspend () -> Unit) {
+    // Cancel any ongoing focus jobs
+    focusJob?.cancel()
+    focusJob = null
+
     mutex.withLock {
       block()
       configure()
@@ -136,12 +142,16 @@ class PersistentCameraCaptureSession(private val cameraManager: CameraManager, p
   suspend fun capture(
     qualityPrioritization: QualityPrioritization,
     flash: Flash,
-    enableRedEyeReduction: Boolean,
     enableAutoStabilization: Boolean,
     enablePhotoHdr: Boolean,
     orientation: Orientation,
-    enableShutterSound: Boolean
+    enableShutterSound: Boolean,
+    enablePrecapture: Boolean
   ): TotalCaptureResult {
+    // Cancel any ongoing focus jobs
+    focusJob?.cancel()
+    focusJob = null
+
     mutex.withLock {
       Log.i(TAG, "Capturing photo...")
       val session = session ?: throw CameraNotReadyError()
@@ -149,8 +159,6 @@ class PersistentCameraCaptureSession(private val cameraManager: CameraManager, p
       val photoRequest = PhotoCaptureRequest(
         repeatingRequest,
         qualityPrioritization,
-        flash,
-        enableRedEyeReduction,
         enableAutoStabilization,
         enablePhotoHdr,
         orientation
@@ -160,86 +168,92 @@ class PersistentCameraCaptureSession(private val cameraManager: CameraManager, p
 
       // Submit a single high-res capture to photo output as well as all preview outputs
       val outputs = outputs
-      val request = photoRequest.createCaptureRequest(device, deviceDetails, outputs)
-      return session.capture(request.build(), enableShutterSound)
+      val repeatingOutputs = outputs.filter { it.isRepeating }
+
+      val skipPrecapture = !enablePrecapture || qualityPrioritization == QualityPrioritization.SPEED
+      if (skipPrecapture && flash == Flash.OFF) {
+        // 0. We want to take a picture as fast as possible, so skip any precapture sequence and just capture one Frame.
+        Log.i(TAG, "Using fast capture path without pre-capture sequence...")
+        val singleRequest = photoRequest.createCaptureRequest(device, deviceDetails, outputs)
+        return session.capture(singleRequest.build(), enableShutterSound)
+      }
+
+      Log.i(TAG, "Locking AF/AE/AWB...")
+
+      // 1. Run precapture sequence
+      var needsFlash: Boolean
+      try {
+        val precaptureRequest = repeatingRequest.createCaptureRequest(device, deviceDetails, repeatingOutputs)
+        val skipIfPassivelyFocused = flash == Flash.OFF
+        val options = PrecaptureOptions(
+          listOf(PrecaptureTrigger.AF, PrecaptureTrigger.AE, PrecaptureTrigger.AWB),
+          flash,
+          emptyList(),
+          skipIfPassivelyFocused,
+          PRECAPTURE_LOCK_TIMEOUT
+        )
+        val result = session.precapture(precaptureRequest, deviceDetails, options)
+        needsFlash = result.needsFlash
+      } catch (e: CaptureTimedOutError) {
+        // the precapture just timed out after 5 seconds, take picture anyways without focus.
+        needsFlash = false
+      } catch (e: FocusCanceledError) {
+        throw CaptureAbortedError(false)
+      }
+
+      try {
+        // 2. Once precapture AF/AE/AWB successfully locked, capture the actual photo
+        val singleRequest = photoRequest.createCaptureRequest(device, deviceDetails, outputs)
+        if (needsFlash) {
+          singleRequest.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+          singleRequest.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_SINGLE)
+        }
+        return session.capture(singleRequest.build(), enableShutterSound)
+      } finally {
+        // 3. After taking a photo we set the repeating request back to idle to remove the AE/AF/AWB locks again
+        val idleRequest = repeatingRequest.createCaptureRequest(device, deviceDetails, repeatingOutputs)
+        session.setRepeatingRequest(idleRequest.build(), null, null)
+      }
     }
   }
 
   suspend fun focus(point: Point) {
+    // Cancel any previous focus jobs
+    focusJob?.cancel()
+    focusJob = null
+
     mutex.withLock {
       Log.i(TAG, "Focusing to $point...")
       val session = session ?: throw CameraNotReadyError()
       val repeatingRequest = repeatingRequest ?: throw CameraNotReadyError()
       val device = session.device
       val deviceDetails = getOrCreateCameraDeviceDetails(device)
-      if (!deviceDetails.supportsTapToFocus) {
+      if (!deviceDetails.supportsFocusRegions) {
         throw FocusNotSupportedError()
       }
       val outputs = outputs.filter { it.isRepeating }
-      val meteringRectangle = MeteringRectangle(point, DEFAULT_METERING_SIZE, MeteringRectangle.METERING_WEIGHT_MAX - 1)
 
-      // 0. Cancel the 3 second focus reset task
-      focusResetJob?.cancelAndJoin()
-      focusResetJob = null
-
-      // 1. Cancel any ongoing AF/AE/AWB request
-      repeatingRequest.createCaptureRequest(device, deviceDetails, outputs).also { request ->
-        if (deviceDetails.supportsTapToFocus) {
-          request.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_CANCEL)
-        }
-        if (deviceDetails.supportsTapToExposure) {
-          request.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER, CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_CANCEL)
-        }
-        session.capture(request.build(), null, null)
+      // 1. Run a precapture sequence for AF, AE and AWB.
+      focusJob = coroutineScope.launch {
+        val request = repeatingRequest.createCaptureRequest(device, deviceDetails, outputs)
+        val options =
+          PrecaptureOptions(listOf(PrecaptureTrigger.AF, PrecaptureTrigger.AE), Flash.OFF, listOf(point), false, FOCUS_RESET_TIMEOUT)
+        session.precapture(request, deviceDetails, options)
       }
+      focusJob?.join()
 
-      // 2. After previous AF/AE/AWB requests have been canceled, start a new AF/AE/AWB request
-      repeatingRequest.createCaptureRequest(device, deviceDetails, outputs).also { request ->
-        request.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
-        if (deviceDetails.supportsTapToFocus) {
-          request.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
-          request.set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(meteringRectangle))
-          request.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_START)
-        }
-        if (deviceDetails.supportsTapToExposure) {
-          request.set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(meteringRectangle))
-          request.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER, CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_START)
-        }
-        if (deviceDetails.supportsTapToWhiteBalance) {
-          request.set(CaptureRequest.CONTROL_AWB_REGIONS, arrayOf(meteringRectangle))
-        }
-        session.capture(request.build(), null, null)
-
-        // 3. Start a repeating request without the trigger and wait until AF/AE/AWB locks
-        request.set(CaptureRequest.CONTROL_AF_TRIGGER, null)
-        request.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER, null)
-        session.setRepeatingRequestAndWaitForAF(request.build())
-      }
-
-      // 4. After the Camera has successfully found the AF/AE/AWB lock-point, we set it to idle and keep the point metered
-      repeatingRequest.createCaptureRequest(device, deviceDetails, outputs).also { request ->
-        request.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
-        if (deviceDetails.supportsTapToFocus) {
-          request.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
-          request.set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(meteringRectangle))
-          request.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_IDLE)
-        }
-        if (deviceDetails.supportsTapToExposure) {
-          request.set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(meteringRectangle))
-          request.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER, CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_IDLE)
-        }
-        session.setRepeatingRequest(request.build(), null, null)
-      }
-
-      // 5. Wait 3 seconds
-      focusResetJob = coroutineScope.launch {
+      // 2. Reset AF/AE/AWB again after 3 seconds timeout
+      focusJob = coroutineScope.launch {
         delay(FOCUS_RESET_TIMEOUT)
         if (!this.isActive) {
           // this job got canceled from the outside
           return@launch
         }
+        if (!isRunning || this@PersistentCameraCaptureSession.session != session) {
+          // the view/session has already been destroyed in the meantime
+          return@launch
+        }
         Log.i(TAG, "Resetting focus to auto-focus...")
-        // 6. Reset AF/AE/AWB to continuous auto-focus again, which is the default here.
         repeatingRequest.createCaptureRequest(device, deviceDetails, outputs).also { request ->
           session.setRepeatingRequest(request.build(), null, null)
         }
@@ -279,8 +293,8 @@ class PersistentCameraCaptureSession(private val cameraManager: CameraManager, p
         val builder = repeatingRequest.createCaptureRequest(device, details, repeatingOutputs)
         session.setRepeatingRequest(builder.build(), null, null)
       } else {
-        session.stopRepeating()
         Log.d(TAG, "Stopping repeating request...")
+        session.tryStopRepeating()
       }
       Log.d(TAG, "Configure() done! isActive: $isActive, ID: $cameraId, device: $device, session: $session")
     } catch (e: CameraAccessException) {
