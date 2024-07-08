@@ -44,6 +44,10 @@ class CameraConfiguration {
 
   // isActive (Start/Stop)
   var isActive = false
+  
+  // CameraView の UIApplication.shared.isIdleTimerDisabled = isActive 部分
+  // isActive = falseの場合でもkeepAwakeがtrueの場合はスリープさせない
+  var isKeepAwake = false
 
   // Audio Session
   var audio: OutputConfiguration<Audio> = .disabled
@@ -64,6 +68,7 @@ class CameraConfiguration {
       zoom = other.zoom
       exposure = other.exposure
       isActive = other.isActive
+      isKeepAwake = other.isKeepAwake
       audio = other.audio
     } else {
       // self will just be initialized with the default values.

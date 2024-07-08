@@ -45,6 +45,8 @@ export interface CameraProps extends ViewProps {
    */
   isActive: boolean
 
+  isKeepAwake: boolean
+
   //#region Use-cases
   /**
    * Enables **photo capture** with the `takePhoto` function (see ["Taking Photos"](https://react-native-vision-camera.com/docs/guides/taking-photos))

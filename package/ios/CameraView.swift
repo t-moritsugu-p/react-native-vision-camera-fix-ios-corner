@@ -44,6 +44,7 @@ public final class CameraView: UIView, CameraSessionDelegate {
   @objc var orientation: NSString?
   // other props
   @objc var isActive = false
+  @objc var isKeepAwake = false
   @objc var torch = "off"
   @objc var zoom: NSNumber = 1.0 // in "factor"
   @objc var exposure: NSNumber = 1.0
@@ -237,6 +238,7 @@ public final class CameraView: UIView, CameraSessionDelegate {
 
       // isActive
       config.isActive = isActive
+      config.isKeepAwake = isKeepAwake
     }
 
     // Store `zoom` offset for native pinch-gesture
@@ -252,7 +254,7 @@ public final class CameraView: UIView, CameraSessionDelegate {
     }
 
     // Prevent phone from going to sleep
-    UIApplication.shared.isIdleTimerDisabled = isActive
+    UIApplication.shared.isIdleTimerDisabled = isActive || isKeepAwake
   }
 
   func setupFpsGraph() {
