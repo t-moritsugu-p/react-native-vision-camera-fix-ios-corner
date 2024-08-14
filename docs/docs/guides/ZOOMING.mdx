@@ -43,8 +43,7 @@ A Camera's `zoom` property is represented in a **logarithmic scale**. That means
 
 The above example only demonstrates how to animate the `zoom` property. To actually implement pinch-to-zoom or pan-to-zoom, take a look at the [VisionCamera example app](https://github.com/mrousavy/react-native-vision-camera/tree/main/package/example), the pinch-to-zoom gesture can be found [here](https://github.com/mrousavy/react-native-vision-camera/blob/main/package/example/src/views/CaptureButton.tsx#L189-L208), and the pan-to-zoom gesture can be found [here](https://github.com/mrousavy/react-native-vision-camera/blob/d8551792e97eaa6fa768f54059ffce054bf748d9/example/src/views/CaptureButton.tsx#L185-L205). They implement a real world use-case, where the maximum zoom value is clamped to a realistic value, and the zoom responds very gracefully by using a logarithmic scale.
 
-
-## Implementation (Reanimated)
+## Example (Reanimated + Gesture Handler)
 
 While you can use any animation library to animate the `zoom` property (or use no animation library at all) it is recommended to use [react-native-reanimated](https://github.com/software-mansion/react-native-reanimated) to achieve best performance. Head over to their [Installation guide](https://docs.swmansion.com/react-native-reanimated/docs/installation) to install Reanimated if you haven't already.
 
@@ -58,52 +57,64 @@ While you can use any animation library to animate the `zoom` property (or use n
 
 ### Code
 
-The following example implements a button which smoothly zooms to a random value using [react-native-reanimated](https://github.com/software-mansion/react-native-reanimated):
+The following example implements a pinch-to-zoom gesture using [react-native-gesture-handler](https://github.com/software-mansion/react-native-gesture-handler/) and [react-native-reanimated](https://github.com/software-mansion/react-native-reanimated):
 
 ```tsx
-import Reanimated, {
-  useAnimatedProps,
-  useSharedValue,
-  withSpring,
-  addWhitelistedNativeProps
-} from "react-native-reanimated"
+import { Camera, useCameraDevice, CameraProps } from 'react-native-vision-camera'
+import Reanimated, { useAnimatedProps, useSharedValue } from 'react-native-reanimated'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 
-const ReanimatedCamera = Reanimated.createAnimatedComponent(Camera)
-addWhitelistedNativeProps({
+// highlight-start
+Reanimated.addWhitelistedNativeProps({
   zoom: true,
 })
+const ReanimatedCamera = Reanimated.createAnimatedComponent(Camera)
+// highlight-end
 
 export function App() {
   const device = useCameraDevice('back')
-  const zoom = useSharedValue(0)
+  // highlight-next-line
+  const zoom = useSharedValue(device.neutralZoom)
 
-  const onRandomZoomPress = useCallback(() => {
-    zoom.value = withSpring(Math.random())
-  }, [zoom])
+  const zoomOffset = useSharedValue(0);
+  const gesture = Gesture.Pinch()
+    .onBegin(() => {
+      zoomOffset.value = zoom.value
+    })
+    .onUpdate(event => {
+      const z = zoomOffset.value * event.scale
+      zoom.value = interpolate(
+        z,
+        [1, 10],
+        [device.minZoom, device.maxZoom],
+        Extrapolation.CLAMP,
+      )
+    })
 
-  const animatedProps = useAnimatedProps<Partial<CameraProps>>(
+  // highlight-start
+  const animatedProps = useAnimatedProps<CameraProps>(
     () => ({ zoom: zoom.value }),
     [zoom]
   )
+  // highlight-end
 
   if (device == null) return <NoCameraDeviceError />
   return (
-    <>
+    <GestureDetector gesture={gesture}>
+      // highlight-next-line
       <ReanimatedCamera
         style={StyleSheet.absoluteFill}
         device={device}
         isActive={true}
+        // highlight-next-line
         animatedProps={animatedProps}
       />
-      <TouchableOpacity
-        style={styles.zoomButton}
-        onPress={onRandomZoomPress}>
-        <Text>Zoom randomly!</Text>
-      </TouchableOpacity>
-    </>
+    </GestureDetector>
   )
 }
 ```
+
+You can also use Gesture Handler to implement different zoom gestures, such as the slide-up-to-zoom as seen in Instagram or Snapchat, or a slider as seen in the stock iOS Camera app.
 
 <br />
 

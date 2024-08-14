@@ -30,7 +30,7 @@ A Code Scanner is a separate Camera output (just like photo or video) that can d
 
 On iOS, the Code Scanner uses the platform-native APIs and can be used out of the box.
 
-On Android, the [MLKit Vision Barcode Scanning](https://developers.google.com/ml-kit/vision/barcode-scanning) API will be used, and the model (2.2MB) needs to be downloaded first.
+On Android, the [MLKit Vision Barcode Scanning](https://developers.google.com/ml-kit/vision/barcode-scanning) API will be used, and the model (2.2MB) needs to be included into your app first.
 
 <Tabs
   groupId="environment"
@@ -41,21 +41,16 @@ On Android, the [MLKit Vision Barcode Scanning](https://developers.google.com/ml
   ]}>
 <TabItem value="rn">
 
-To download the model when the user installs your app, add this to your `AndroidManifest.xml` file:
+Inside your `gradle.properties` file, add the `enableCodeScanner` flag:
 
-```xml
-<application ...>
-      ...
-      <meta-data
-          android:name="com.google.mlkit.vision.DEPENDENCIES"
-          android:value="barcode" />
-</application>
+```groovy
+VisionCamera_enableCodeScanner=true
 ```
 
 </TabItem>
 <TabItem value="expo">
 
-To download the model when the user installs your app, add the `enableCodeScanner` flag to your Expo config (`app.json`, `app.config.json` or `app.config.js`):
+Add the `enableCodeScanner` flag to your Expo config (`app.json`, `app.config.json` or `app.config.js`):
 
 ```json
 {
@@ -77,7 +72,7 @@ To download the model when the user installs your app, add the `enableCodeScanne
 
 ## Usage
 
-To use a codescanner, simply create a [`CodeScanner`](/docs/api/interfaces/CodeScanner) and pass it to the `<Camera>`:
+To scan codes, simply create a [`CodeScanner`](/docs/api/interfaces/CodeScanner) instance and pass it to the `<Camera>`:
 
 <Tabs
   groupId="component-style"
@@ -124,15 +119,27 @@ render() {
 </TabItem>
 </Tabs>
 
-## Separate Output
-
-Since the Code Scanner is a separate camera output (just like photo or video), it cannot be attached simultaneously with photo and video enabled.
-You need to disable either `photo`, `video`, or the `codeScanner`.
-
 ## Code result
 
-The Code Scanner will call your [`onCodeScanned`](/docs/api/interfaces/CodeScanner#oncodescanned) callback with all detected codes ([`Code`](/docs/api/interfaces/Code)), including their decoded string value, and their coordinates on the screen relative to the Preview.
+The Code Scanner will call your [`onCodeScanned`](/docs/api/interfaces/CodeScanner#oncodescanned) callback with all detected codes ([`Code`](/docs/api/interfaces/Code)), including their decoded string value, and their coordinates on the screen relative to subject area of the Code Scanner (the [`frame`](/docs/api/interfaces/Code#frame)).
 
-<br />
+## UPC-A vs EAN-13 codes
+
+UPC-A is a special case to handle if you need to cater for it. Android's SDK officially supports UPC-A but iOS does not, instead they handle the code as EAN-13. Since EAN-13 is a superset of UPC-A, with an extra 0 digit at the front.
+
+This means, the `upc-a` types are reported under the `ean-13` umbrella type on iOS:
+
+```jsx
+const codeScanner = useCodeScanner({
+  codeTypes: ['upc-a'], // <-- ✅ We configure for 'upc-a' types
+  onCodeScanned: (codes) => {
+    for (const code of codes) {
+      console.log(code.type); // <-- ❌ On iOS, we receive 'ean-13'
+    }
+  }
+})
+```
+
+You will need to keep this in mind and do the conversion from EAN-13 to UPC-A yourself. This can be done by removing the front `0` digit from the code to get a UPC-A code.
 
 #### 🚀 Next section: [Frame Processors](frame-processors)

@@ -1,7 +1,6 @@
 project(VisionCamera)
 cmake_minimum_required(VERSION 3.9.0)
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
 set(PACKAGE_NAME "VisionCamera")
 set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -11,6 +10,10 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(ReactAndroid REQUIRED CONFIG)
 find_package(fbjni REQUIRED CONFIG)
 find_library(LOG_LIB log)
+
+# Enables OpenGL/EGL HardwareBuffer and EGLImageKHR APIs
+add_definitions(-DEGL_EGLEXT_PROTOTYPES)
+add_definitions(-DGL_GLEXT_PROTOTYPES)
 
 if (ENABLE_FRAME_PROCESSORS)
         add_definitions(-DVISION_CAMERA_ENABLE_FRAME_PROCESSORS=true)
@@ -23,32 +26,29 @@ endif()
 add_library(
         ${PACKAGE_NAME}
         SHARED
-        ../cpp/JSITypedArray.cpp
+        # Java JNI
         src/main/cpp/VisionCamera.cpp
-        src/main/cpp/VideoPipeline.cpp
-        src/main/cpp/PassThroughShader.cpp
-        src/main/cpp/OpenGLContext.cpp
-        src/main/cpp/OpenGLRenderer.cpp
+        src/main/cpp/MutableJByteBuffer.cpp
         # Frame Processor
-        src/main/cpp/frameprocessor/FrameHostObject.cpp
-        src/main/cpp/frameprocessor/FrameProcessorPluginHostObject.cpp
-        src/main/cpp/frameprocessor/JSIJNIConversion.cpp
-        src/main/cpp/frameprocessor/VisionCameraProxy.cpp
-        src/main/cpp/frameprocessor/java-bindings/JFrame.cpp
-        src/main/cpp/frameprocessor/java-bindings/JFrameProcessor.cpp
-        src/main/cpp/frameprocessor/java-bindings/JFrameProcessorPlugin.cpp
-        src/main/cpp/frameprocessor/java-bindings/JVisionCameraProxy.cpp
-        src/main/cpp/frameprocessor/java-bindings/JVisionCameraScheduler.cpp
+        src/main/cpp/frameprocessors/FrameHostObject.cpp
+        src/main/cpp/frameprocessors/FrameProcessorPluginHostObject.cpp
+        src/main/cpp/frameprocessors/JSIJNIConversion.cpp
+        src/main/cpp/frameprocessors/VisionCameraProxy.cpp
+        src/main/cpp/frameprocessors/java-bindings/JSharedArray.cpp
+        src/main/cpp/frameprocessors/java-bindings/JFrame.cpp
+        src/main/cpp/frameprocessors/java-bindings/JFrameProcessor.cpp
+        src/main/cpp/frameprocessors/java-bindings/JFrameProcessorPlugin.cpp
+        src/main/cpp/frameprocessors/java-bindings/JVisionCameraProxy.cpp
+        src/main/cpp/frameprocessors/java-bindings/JVisionCameraScheduler.cpp
 )
 
 # Header Search Paths (includes)
 target_include_directories(
         ${PACKAGE_NAME}
         PRIVATE
-        "../cpp"
         "src/main/cpp"
-        "src/main/cpp/frameprocessor"
-        "src/main/cpp/frameprocessor/java-bindings"
+        "src/main/cpp/frameprocessors"
+        "src/main/cpp/frameprocessors/java-bindings"
         "${NODE_MODULES_DIR}/react-native/ReactCommon"
         "${NODE_MODULES_DIR}/react-native/ReactCommon/callinvoker"
         "${NODE_MODULES_DIR}/react-native/ReactAndroid/src/main/jni/react/turbomodule" # <-- CallInvokerHolder JNI wrapper
@@ -62,8 +62,6 @@ target_link_libraries(
         ReactAndroid::jsi                   # <-- RN: JSI
         ReactAndroid::reactnativejni        # <-- RN: React Native JNI bindings
         fbjni::fbjni                        # <-- fbjni
-        GLESv2                              # <-- OpenGL (for VideoPipeline)
-        EGL                                 # <-- OpenGL (EGL) (for VideoPipeline)
 )
 
 # Optionally also add Frame Processors here

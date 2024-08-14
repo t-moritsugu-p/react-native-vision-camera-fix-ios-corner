@@ -1,9 +1,16 @@
 import { Dimensions } from 'react-native'
-import { FormatFilter } from './getCameraFormat'
+import type { FormatFilter } from './getCameraFormat'
 
-type TTemplates = {
-  [key: string]: FormatFilter[]
-}
+type PredefinedTemplates =
+  | 'Video'
+  | 'Video60Fps'
+  | 'VideoSlowMotion'
+  | 'VideoStabilized'
+  | 'Photo'
+  | 'PhotoPortrait'
+  | 'FrameProcessing'
+  | 'Snapchat'
+  | 'Instagram'
 
 const SnapchatResolution = { width: 1920, height: 1080 }
 const InstagramResolution = { width: 3840, height: 2160 }
@@ -16,7 +23,7 @@ const ScreenAspectRatio = Dimensions.get('window').height / Dimensions.get('wind
  * const format = useCameraFormat(device, Templates.Snapchat)
  * ```
  */
-export const Templates: TTemplates = {
+export const Templates: Record<PredefinedTemplates, FormatFilter[]> = {
   /**
    * Highest resolution video recordings (e.g. 4k)
    */
@@ -42,13 +49,9 @@ export const Templates: TTemplates = {
    */
   PhotoPortrait: [{ photoResolution: 'max' }, { photoAspectRatio: ScreenAspectRatio }],
   /**
-   * HD-quality for faster Frame Processing in YUV pixelFormat (e.g. 720p)
+   * HD-quality for faster Frame Processing (e.g. 720p)
    */
-  FrameProcessingYUV: [{ videoResolution: { width: 1080, height: 720 } }, { pixelFormat: 'yuv' }],
-  /**
-   * HD-quality for faster Frame Processing in RGB pixelFormat (e.g. 720p)
-   */
-  FrameProcessingRGB: [{ videoResolution: { width: 1080, height: 720 } }, { pixelFormat: 'rgb' }],
+  FrameProcessing: [{ videoResolution: { width: 1080, height: 720 } }],
   /**
    * Snapchat-style video recordings and photo capture
    * Targets Full HD-quality for lower file sizes and portrait screen aspect ratio.

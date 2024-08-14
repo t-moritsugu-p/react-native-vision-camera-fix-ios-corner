@@ -8,20 +8,27 @@
 
 import AVFoundation
 
-// Keeps a strong reference on delegates, as the AVCapturePhotoOutput only holds a weak reference.
-private var delegatesReferences: [NSObject] = []
-
 // MARK: - PhotoCaptureDelegate
 
-class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
+class PhotoCaptureDelegate: GlobalReferenceHolder, AVCapturePhotoCaptureDelegate {
   private let promise: Promise
   private let enableShutterSound: Bool
+  private let cameraSessionDelegate: CameraSessionDelegate?
+  private let metadataProvider: MetadataProvider
+  private let path: URL
 
-  required init(promise: Promise, enableShutterSound: Bool) {
+  required init(promise: Promise,
+                enableShutterSound: Bool,
+                metadataProvider: MetadataProvider,
+                path: URL,
+                cameraSessionDelegate: CameraSessionDelegate?) {
     self.promise = promise
     self.enableShutterSound = enableShutterSound
+    self.metadataProvider = metadataProvider
+    self.path = path
+    self.cameraSessionDelegate = cameraSessionDelegate
     super.init()
-    delegatesReferences.append(self)
+    makeGlobal()
   }
 
   func photoOutput(_: AVCapturePhotoOutput, willCapturePhotoFor _: AVCaptureResolvedPhotoSettings) {
@@ -29,33 +36,25 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
       // disable system shutter sound (see https://stackoverflow.com/a/55235949/5281431)
       AudioServicesDisposeSystemSoundID(1108)
     }
+
+    // onShutter(..) event
+    cameraSessionDelegate?.onCaptureShutter(shutterType: .photo)
   }
 
   func photoOutput(_: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
     defer {
-      delegatesReferences.removeAll(where: { $0 == self })
+      removeGlobal()
     }
     if let error = error as NSError? {
       promise.reject(error: .capture(.unknown(message: error.description)), cause: error)
       return
     }
 
-    let error = ErrorPointer(nilLiteral: ())
-    guard let tempFilePath = RCTTempFilePath("jpeg", error)
-    else {
-      let message = error?.pointee?.description
-      promise.reject(error: .capture(.createTempFileError(message: message)), cause: error?.pointee)
-      return
-    }
-    let url = URL(string: "file://\(tempFilePath)")!
-
-    guard let data = photo.fileDataRepresentation() else {
-      promise.reject(error: .capture(.fileError))
-      return
-    }
-
     do {
-      try data.write(to: url)
+      try FileUtils.writePhotoToFile(photo: photo,
+                                     metadataProvider: metadataProvider,
+                                     file: path)
+
       let exif = photo.metadata["{Exif}"] as? [String: Any]
       let width = exif?["PixelXDimension"]
       let height = exif?["PixelYDimension"]
@@ -65,7 +64,7 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
       let isMirrored = getIsMirrored(forExifOrientation: cgOrientation)
 
       promise.resolve([
-        "path": tempFilePath,
+        "path": path.absoluteString,
         "width": width as Any,
         "height": height as Any,
         "orientation": orientation,
@@ -74,17 +73,23 @@ class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
         "metadata": photo.metadata,
         "thumbnail": photo.embeddedThumbnailPhotoFormat as Any,
       ])
+    } catch let error as CameraError {
+      promise.reject(error: error)
     } catch {
-      promise.reject(error: .capture(.fileError), cause: error as NSError)
+      promise.reject(error: .capture(.unknown(message: "An unknown error occured while capturing the photo!")), cause: error as NSError)
     }
   }
 
   func photoOutput(_: AVCapturePhotoOutput, didFinishCaptureFor _: AVCaptureResolvedPhotoSettings, error: Error?) {
     defer {
-      delegatesReferences.removeAll(where: { $0 == self })
+      removeGlobal()
     }
     if let error = error as NSError? {
-      promise.reject(error: .capture(.unknown(message: error.description)), cause: error)
+      if error.code == -11807 {
+        promise.reject(error: .capture(.insufficientStorage), cause: error)
+      } else {
+        promise.reject(error: .capture(.unknown(message: error.description)), cause: error)
+      }
       return
     }
   }

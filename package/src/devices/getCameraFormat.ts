@@ -1,6 +1,5 @@
-import type { CameraDevice, CameraDeviceFormat, VideoStabilizationMode } from '../CameraDevice'
+import type { AutoFocusSystem, CameraDevice, CameraDeviceFormat, VideoStabilizationMode } from '../types/CameraDevice'
 import { CameraRuntimeError } from '../CameraError'
-import { PixelFormat } from '../PixelFormat'
 
 interface Size {
   width: number
@@ -49,17 +48,12 @@ export interface FormatFilter {
    * The target FPS you want to record video at.
    * If the FPS requirements can not be met, the format closest to this value will be used.
    */
-  fps?: number
+  fps?: number | 'max'
   /**
    * The target video stabilization mode you want to use.
    * If no format supports the target video stabilization mode, the best other matching format will be used.
    */
   videoStabilizationMode?: VideoStabilizationMode
-  /**
-   * The target pixel format you want to use.
-   * If no format supports the target pixel format, the best other matching format will be used.
-   */
-  pixelFormat?: PixelFormat
   /**
    * Whether you want to find a format that supports Photo HDR.
    */
@@ -68,6 +62,18 @@ export interface FormatFilter {
    * Whether you want to find a format that supports Photo HDR.
    */
   videoHdr?: boolean
+  /**
+   * The target ISO value for capturing photos.
+   * Higher ISO values tend to capture sharper photos, at the cost of reduced capture speed.
+   * Lower ISO values tend to capture photos quicker.
+   */
+  iso?: number | 'max' | 'min'
+  /**
+   * The target auto-focus system.
+   * While `phase-detection` is generally the best system available,
+   * you might want to choose a different auto-focus system.
+   */
+  autoFocusSystem?: AutoFocusSystem
 }
 
 type FilterWithPriority<T> = {
@@ -99,7 +105,7 @@ function filtersToFilterMap(filters: FormatFilter[]): FilterMap {
  * This means the first item you pass will have a higher priority than the second, and so on.
  *
  * @param device The Camera Device you're currently using
- * @param filter The filter you want to use. The format that matches your filter the closest will be returned
+ * @param filters The filters you want to use. The format that matches your filter the closest will be returned
  * @returns The format that matches your filter the closest.
  *
  * @example
@@ -181,32 +187,53 @@ export function getCameraFormat(device: CameraDevice, filters: FormatFilter[]): 
 
     // Find closest max FPS
     if (filter.fps != null) {
-      if (bestFormat.maxFps >= filter.fps.target) leftPoints += filter.fps.priority
-      if (format.maxFps >= filter.fps.target) rightPoints += filter.fps.priority
+      if (filter.fps.target === 'max') {
+        if (bestFormat.maxFps > format.maxFps) leftPoints += filter.fps.priority
+        if (format.maxFps > bestFormat.maxFps) rightPoints += filter.fps.priority
+      } else {
+        if (bestFormat.maxFps >= filter.fps.target) leftPoints += filter.fps.priority
+        if (format.maxFps >= filter.fps.target) rightPoints += filter.fps.priority
+      }
+    }
+
+    // Find closest ISO
+    if (filter.iso != null) {
+      if (filter.iso.target === 'max') {
+        if (bestFormat.maxISO > format.maxISO) leftPoints += filter.iso.priority
+        if (format.maxISO > bestFormat.maxISO) rightPoints += filter.iso.priority
+      } else if (filter.iso.target === 'min') {
+        if (bestFormat.minISO < format.minISO) leftPoints += filter.iso.priority
+        if (format.minISO < bestFormat.minISO) rightPoints += filter.iso.priority
+      } else {
+        if (filter.iso.target >= bestFormat.minISO && filter.iso.target <= bestFormat.maxISO) leftPoints += filter.iso.priority
+        if (filter.iso.target >= format.minISO && filter.iso.target <= format.maxISO) rightPoints += filter.iso.priority
+      }
     }
 
     // Find video stabilization mode
     if (filter.videoStabilizationMode != null) {
-      if (bestFormat.videoStabilizationModes.includes(filter.videoStabilizationMode.target)) leftPoints++
-      if (format.videoStabilizationModes.includes(filter.videoStabilizationMode.target)) rightPoints++
-    }
-
-    // Find pixel format
-    if (filter.pixelFormat != null) {
-      if (bestFormat.pixelFormats.includes(filter.pixelFormat.target)) leftPoints++
-      if (format.pixelFormats.includes(filter.pixelFormat.target)) rightPoints++
+      if (bestFormat.videoStabilizationModes.includes(filter.videoStabilizationMode.target))
+        leftPoints += filter.videoStabilizationMode.priority
+      if (format.videoStabilizationModes.includes(filter.videoStabilizationMode.target))
+        rightPoints += filter.videoStabilizationMode.priority
     }
 
     // Find Photo HDR formats
     if (filter.photoHdr != null) {
-      if (bestFormat.supportsPhotoHdr === filter.photoHdr.target) leftPoints++
-      if (format.supportsPhotoHdr === filter.photoHdr.target) rightPoints++
+      if (bestFormat.supportsPhotoHdr === filter.photoHdr.target) leftPoints += filter.photoHdr.priority
+      if (format.supportsPhotoHdr === filter.photoHdr.target) rightPoints += filter.photoHdr.priority
     }
 
     // Find Video HDR formats
     if (filter.videoHdr != null) {
-      if (bestFormat.supportsVideoHdr === filter.videoHdr.target) leftPoints++
-      if (format.supportsVideoHdr === filter.videoHdr.target) rightPoints++
+      if (bestFormat.supportsVideoHdr === filter.videoHdr.target) leftPoints += filter.videoHdr.priority
+      if (format.supportsVideoHdr === filter.videoHdr.target) rightPoints += filter.videoHdr.priority
+    }
+
+    // Find matching AF system
+    if (filter.autoFocusSystem != null) {
+      if (bestFormat.autoFocusSystem === filter.autoFocusSystem.target) leftPoints += filter.autoFocusSystem.priority
+      if (format.autoFocusSystem === filter.autoFocusSystem.target) rightPoints += filter.autoFocusSystem.priority
     }
 
     if (rightPoints > leftPoints) bestFormat = format

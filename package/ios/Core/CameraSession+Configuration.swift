@@ -16,10 +16,10 @@ extension CameraSession {
    Configures the Input Device (`cameraId`)
    */
   func configureDevice(configuration: CameraConfiguration) throws {
-    ReactLogger.log(level: .info, message: "Configuring Input Device...")
+    VisionLogger.log(level: .info, message: "Configuring Input Device...")
 
     // Remove all inputs
-    captureSession.inputs.forEach { input in
+    for input in captureSession.inputs {
       captureSession.removeInput(input)
     }
     videoDeviceInput = nil
@@ -33,7 +33,7 @@ extension CameraSession {
       throw CameraError.device(.noDevice)
     }
 
-    ReactLogger.log(level: .info, message: "Configuring Camera \(cameraId)...")
+    VisionLogger.log(level: .info, message: "Configuring Camera \(cameraId)...")
     // Video Input (Camera Device/Sensor)
     guard let videoDevice = AVCaptureDevice(uniqueID: cameraId) else {
       throw CameraError.device(.invalid)
@@ -45,7 +45,10 @@ extension CameraSession {
     captureSession.addInput(input)
     videoDeviceInput = input
 
-    ReactLogger.log(level: .info, message: "Successfully configured Input Device!")
+    // Update Orientation manager (uses device relative sensor orientation)
+    orientationManager.setInputDevice(videoDevice)
+
+    VisionLogger.log(level: .info, message: "Successfully configured Input Device!")
   }
 
   // pragma MARK: Outputs
@@ -54,10 +57,10 @@ extension CameraSession {
    Configures all outputs (`photo` + `video` + `codeScanner`)
    */
   func configureOutputs(configuration: CameraConfiguration) throws {
-    ReactLogger.log(level: .info, message: "Configuring Outputs...")
+    VisionLogger.log(level: .info, message: "Configuring Outputs...")
 
     // Remove all outputs
-    captureSession.outputs.forEach { output in
+    for output in captureSession.outputs {
       captureSession.removeOutput(output)
     }
     photoOutput = nil
@@ -66,7 +69,7 @@ extension CameraSession {
 
     // Photo Output
     if case let .enabled(photo) = configuration.photo {
-      ReactLogger.log(level: .info, message: "Adding Photo output...")
+      VisionLogger.log(level: .info, message: "Adding Photo output...")
 
       // 1. Add
       let photoOutput = AVCapturePhotoOutput()
@@ -76,32 +79,26 @@ extension CameraSession {
       captureSession.addOutput(photoOutput)
 
       // 2. Configure
-      if photo.enableHighQualityPhotos {
-        // TODO: In iOS 16 this will be removed in favor of maxPhotoDimensions.
-        photoOutput.isHighResolutionCaptureEnabled = true
-        if #available(iOS 13.0, *) {
-          // TODO: Test if this actually does any fusion or if this just calls the captureOutput twice. If the latter, remove it.
-          photoOutput.isVirtualDeviceConstituentPhotoDeliveryEnabled = photoOutput.isVirtualDeviceConstituentPhotoDeliverySupported
-          photoOutput.maxPhotoQualityPrioritization = .quality
-        } else {
-          photoOutput.isDualCameraDualPhotoDeliveryEnabled = photoOutput.isDualCameraDualPhotoDeliverySupported
-        }
+      if #available(iOS 13.0, *) {
+        let qualityPrioritization = AVCapturePhotoOutput.QualityPrioritization(fromQualityBalance: photo.qualityBalance)
+        photoOutput.maxPhotoQualityPrioritization = qualityPrioritization
       }
+      if photoOutput.isDepthDataDeliverySupported {
+        photoOutput.isDepthDataDeliveryEnabled = photo.enableDepthData
+      }
+      if photoOutput.isPortraitEffectsMatteDeliverySupported {
+        photoOutput.isPortraitEffectsMatteDeliveryEnabled = photo.enablePortraitEffectsMatte
+      }
+      photoOutput.isMirrored = configuration.isMirrored
       // TODO: Enable isResponsiveCaptureEnabled? (iOS 17+)
       // TODO: Enable isFastCapturePrioritizationEnabled? (iOS 17+)
-      if photo.enableDepthData {
-        photoOutput.isDepthDataDeliveryEnabled = photoOutput.isDepthDataDeliverySupported
-      }
-      if #available(iOS 12.0, *), photo.enablePortraitEffectsMatte {
-        photoOutput.isPortraitEffectsMatteDeliveryEnabled = photoOutput.isPortraitEffectsMatteDeliverySupported
-      }
 
       self.photoOutput = photoOutput
     }
 
     // Video Output + Frame Processor
     if case .enabled = configuration.video {
-      ReactLogger.log(level: .info, message: "Adding Video Data output...")
+      VisionLogger.log(level: .info, message: "Adding Video Data output...")
 
       // 1. Add
       let videoOutput = AVCaptureVideoDataOutput()
@@ -113,12 +110,22 @@ extension CameraSession {
       // 2. Configure
       videoOutput.setSampleBufferDelegate(self, queue: CameraQueues.videoQueue)
       videoOutput.alwaysDiscardsLateVideoFrames = true
+      if configuration.isMirrored {
+        // 2.1. If mirroring is enabled, mirror all connections along the vertical axis
+        videoOutput.isMirrored = true
+        if videoOutput.orientation.isLandscape {
+          // 2.2. If we have a landscape orientation, we need to flip it to counter the mirroring on the wrong axis.
+          videoOutput.orientation = videoOutput.orientation.flipped()
+          VisionLogger.log(level: .info, message: "AVCaptureVideoDataOutput will rotate Frames to \(videoOutput.orientation)...")
+        }
+      }
+
       self.videoOutput = videoOutput
     }
 
     // Code Scanner
     if case let .enabled(codeScanner) = configuration.codeScanner {
-      ReactLogger.log(level: .info, message: "Adding Code Scanner output...")
+      VisionLogger.log(level: .info, message: "Adding Code Scanner output...")
       let codeScannerOutput = AVCaptureMetadataOutput()
 
       // 1. Add
@@ -130,7 +137,7 @@ extension CameraSession {
       // 2. Configure
       let options = codeScanner.options
       codeScannerOutput.setMetadataObjectsDelegate(self, queue: CameraQueues.codeScannerQueue)
-      try codeScanner.options.codeTypes.forEach { type in
+      for type in codeScanner.options.codeTypes {
         // CodeScanner::availableMetadataObjectTypes depends on the connection to the
         // AVCaptureSession, so this list is only available after we add the output to the session.
         if !codeScannerOutput.availableMetadataObjectTypes.contains(type) {
@@ -145,32 +152,25 @@ extension CameraSession {
       self.codeScannerOutput = codeScannerOutput
     }
 
+    // Re-initialize Orientations
+    configurePreviewOrientation(orientationManager.previewOrientation)
+    configureOutputOrientation(orientationManager.outputOrientation)
+
     // Done!
-    ReactLogger.log(level: .info, message: "Successfully configured all outputs!")
+    VisionLogger.log(level: .info, message: "Successfully configured all outputs!")
+
+    // Notify delegate
+    delegate?.onSessionInitialized()
   }
 
   // pragma MARK: Video Stabilization
   func configureVideoStabilization(configuration: CameraConfiguration) {
-    captureSession.outputs.forEach { output in
-      output.connections.forEach { connection in
+    for output in captureSession.outputs {
+      for connection in output.connections {
         if connection.isVideoStabilizationSupported {
           connection.preferredVideoStabilizationMode = configuration.videoStabilizationMode.toAVCaptureVideoStabilizationMode()
         }
       }
-    }
-  }
-
-  // pragma MARK: Orientation
-
-  func configureOrientation(configuration: CameraConfiguration) {
-    // Set up orientation and mirroring for all outputs.
-    // Note: Photos are only rotated through EXIF tags, and Preview through view transforms
-    let isMirrored = videoDeviceInput?.device.position == .front
-    captureSession.outputs.forEach { output in
-      if isMirrored {
-        output.mirror()
-      }
-      output.setOrientation(configuration.orientation)
     }
   }
 
@@ -185,11 +185,11 @@ extension CameraSession {
       return
     }
 
-    ReactLogger.log(level: .info, message: "Configuring Format (\(targetFormat))...")
+    VisionLogger.log(level: .info, message: "Configuring Format (\(targetFormat))...")
 
     let currentFormat = CameraDeviceFormat(fromFormat: device.activeFormat)
     if currentFormat == targetFormat {
-      ReactLogger.log(level: .info, message: "Already selected active format, no need to configure.")
+      VisionLogger.log(level: .info, message: "Already selected active format, no need to configure.")
       return
     }
 
@@ -202,22 +202,44 @@ extension CameraSession {
     // Set new device Format
     device.activeFormat = format
 
-    ReactLogger.log(level: .info, message: "Successfully configured Format!")
+    VisionLogger.log(level: .info, message: "Successfully configured Format!")
   }
 
-  func configurePixelFormat(configuration: CameraConfiguration) throws {
+  func configureVideoOutputFormat(configuration: CameraConfiguration) {
     guard case let .enabled(video) = configuration.video,
           let videoOutput else {
       // Video is not enabled
       return
     }
 
-    // Configure the VideoOutput Settings to use the given Pixel Format.
-    // We need to run this after device.activeFormat has been set, otherwise the VideoOutput can't stream the given Pixel Format.
-    let pixelFormatType = try video.getPixelFormat(for: videoOutput)
-    videoOutput.videoSettings = [
-      String(kCVPixelBufferPixelFormatTypeKey): pixelFormatType,
-    ]
+    do {
+      // Configure the VideoOutput Settings to use the given Pixel Format.
+      // We need to run this after device.activeFormat has been set, otherwise the VideoOutput can't stream the given Pixel Format.
+      let pixelFormatType = try video.getPixelFormat(for: videoOutput)
+      videoOutput.videoSettings = [
+        String(kCVPixelBufferPixelFormatTypeKey): pixelFormatType,
+      ]
+    } catch {
+      // Catch the error and send to JS as a soft-exception.
+      // The default PixelFormat will be used.
+      onConfigureError(error)
+    }
+  }
+
+  func configurePhotoOutputFormat(configuration _: CameraConfiguration) {
+    guard let videoDeviceInput, let photoOutput else {
+      // Photo is not enabled
+      return
+    }
+
+    // Configure the PhotoOutput Settings to use the given max-resolution.
+    // We need to run this after device.activeFormat has been set, otherwise the resolution is different.
+    let format = videoDeviceInput.device.activeFormat
+    if #available(iOS 16.0, *) {
+      photoOutput.maxPhotoDimensions = format.photoDimensions
+    } else {
+      photoOutput.isHighResolutionCaptureEnabled = true
+    }
   }
 
   // pragma MARK: Side-Props
@@ -227,20 +249,21 @@ extension CameraSession {
    */
   func configureSideProps(configuration: CameraConfiguration, device: AVCaptureDevice) throws {
     // Configure FPS
-    if let fps = configuration.fps {
-      let supportsGivenFps = device.activeFormat.videoSupportedFrameRateRanges.contains { range in
-        return range.includes(fps: Double(fps))
+    if let minFps = configuration.minFps,
+       let maxFps = configuration.maxFps {
+      let fpsRanges = device.activeFormat.videoSupportedFrameRateRanges
+      if !fpsRanges.contains(where: { $0.minFrameRate <= Double(minFps) }) {
+        throw CameraError.format(.invalidFps(fps: Int(minFps)))
       }
-      if !supportsGivenFps {
-        throw CameraError.format(.invalidFps(fps: Int(fps)))
+      if !fpsRanges.contains(where: { $0.maxFrameRate >= Double(maxFps) }) {
+        throw CameraError.format(.invalidFps(fps: Int(maxFps)))
       }
 
-      let duration = CMTimeMake(value: 1, timescale: fps)
-      device.activeVideoMinFrameDuration = duration
-      device.activeVideoMaxFrameDuration = duration
+      device.activeVideoMaxFrameDuration = CMTimeMake(value: 1, timescale: minFps)
+      device.activeVideoMinFrameDuration = CMTimeMake(value: 1, timescale: maxFps)
     } else {
-      device.activeVideoMinFrameDuration = CMTime.invalid
       device.activeVideoMaxFrameDuration = CMTime.invalid
+      device.activeVideoMinFrameDuration = CMTime.invalid
     }
 
     // Configure Low-Light-Boost
@@ -249,6 +272,20 @@ extension CameraSession {
         throw CameraError.device(.lowLightBoostNotSupported)
       }
       device.automaticallyEnablesLowLightBoostWhenAvailable = configuration.enableLowLightBoost
+    }
+
+    // Configure auto-focus
+    if device.isFocusModeSupported(.continuousAutoFocus) {
+      if device.isFocusPointOfInterestSupported {
+        device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
+      }
+      device.focusMode = .continuousAutoFocus
+    }
+    if device.isExposureModeSupported(.continuousAutoExposure) {
+      if device.isExposurePointOfInterestSupported {
+        device.exposurePointOfInterest = CGPoint(x: 0.5, y: 0.5)
+      }
+      device.exposureMode = .continuousAutoExposure
     }
   }
 
@@ -305,7 +342,7 @@ extension CameraSession {
    Configures the Audio Capture Session with an audio input and audio data output.
    */
   func configureAudioSession(configuration: CameraConfiguration) throws {
-    ReactLogger.log(level: .info, message: "Configuring Audio Session...")
+    VisionLogger.log(level: .info, message: "Configuring Audio Session...")
 
     // Prevent iOS from automatically configuring the Audio Session for us
     audioCaptureSession.automaticallyConfiguresApplicationAudioSession = false
@@ -320,14 +357,14 @@ extension CameraSession {
     }
 
     // Remove all current inputs
-    audioCaptureSession.inputs.forEach { input in
+    for input in audioCaptureSession.inputs {
       audioCaptureSession.removeInput(input)
     }
     audioDeviceInput = nil
 
     // Audio Input (Microphone)
     if enableAudio {
-      ReactLogger.log(level: .info, message: "Adding Audio input...")
+      VisionLogger.log(level: .info, message: "Adding Audio input...")
       guard let microphone = AVCaptureDevice.default(for: .audio) else {
         throw CameraError.device(.microphoneUnavailable)
       }
@@ -340,14 +377,14 @@ extension CameraSession {
     }
 
     // Remove all current outputs
-    audioCaptureSession.outputs.forEach { output in
+    for output in audioCaptureSession.outputs {
       audioCaptureSession.removeOutput(output)
     }
     audioOutput = nil
 
     // Audio Output
     if enableAudio {
-      ReactLogger.log(level: .info, message: "Adding Audio Data output...")
+      VisionLogger.log(level: .info, message: "Adding Audio Data output...")
       let output = AVCaptureAudioDataOutput()
       guard audioCaptureSession.canAddOutput(output) else {
         throw CameraError.parameter(.unsupportedOutput(outputDescriptor: "audio-output"))

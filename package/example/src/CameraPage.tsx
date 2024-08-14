@@ -1,8 +1,18 @@
 import * as React from 'react'
 import { useRef, useState, useCallback, useMemo } from 'react'
+import type { GestureResponderEvent } from 'react-native'
 import { StyleSheet, Text, View } from 'react-native'
-import { PinchGestureHandler, PinchGestureHandlerGestureEvent, TapGestureHandler } from 'react-native-gesture-handler'
-import { CameraRuntimeError, PhotoFile, useCameraDevice, useCameraFormat, useFrameProcessor, VideoFile } from 'react-native-vision-camera'
+import type { PinchGestureHandlerGestureEvent } from 'react-native-gesture-handler'
+import { PinchGestureHandler, TapGestureHandler } from 'react-native-gesture-handler'
+import type { CameraProps, CameraRuntimeError, PhotoFile, VideoFile } from 'react-native-vision-camera'
+import {
+  runAtTargetFps,
+  useCameraDevice,
+  useCameraFormat,
+  useFrameProcessor,
+  useLocationPermission,
+  useMicrophonePermission,
+} from 'react-native-vision-camera'
 import { Camera } from 'react-native-vision-camera'
 import { CONTENT_SPACING, CONTROL_BUTTON_SIZE, MAX_ZOOM_FACTOR, SAFE_AREA_PADDING, SCREEN_HEIGHT, SCREEN_WIDTH } from './Constants'
 import Reanimated, { Extrapolate, interpolate, useAnimatedGestureHandler, useAnimatedProps, useSharedValue } from 'react-native-reanimated'
@@ -16,9 +26,9 @@ import IonIcon from 'react-native-vector-icons/Ionicons'
 import type { Routes } from './Routes'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { useIsFocused } from '@react-navigation/core'
+import { usePreferredCameraDevice } from './hooks/usePreferredCameraDevice'
 import { examplePlugin } from './frame-processors/ExamplePlugin'
 import { exampleKotlinSwiftPlugin } from './frame-processors/ExampleKotlinSwiftPlugin'
-import { usePreferredCameraDevice } from './hooks/usePreferredCameraDevice'
 
 const ReanimatedCamera = Reanimated.createAnimatedComponent(Camera)
 Reanimated.addWhitelistedNativeProps({
@@ -31,8 +41,9 @@ type Props = NativeStackScreenProps<Routes, 'CameraPage'>
 export function CameraPage({ navigation }: Props): React.ReactElement {
   const camera = useRef<Camera>(null)
   const [isCameraInitialized, setIsCameraInitialized] = useState(false)
-  const [hasMicrophonePermission, setHasMicrophonePermission] = useState(false)
-  const zoom = useSharedValue(0)
+  const microphone = useMicrophonePermission()
+  const location = useLocationPermission()
+  const zoom = useSharedValue(1)
   const isPressingButton = useSharedValue(false)
 
   // check if camera page is active
@@ -73,12 +84,10 @@ export function CameraPage({ navigation }: Props): React.ReactElement {
   const canToggleNightMode = device?.supportsLowLightBoost ?? false
 
   //#region Animated Zoom
-  // This just maps the zoom factor to a percentage value.
-  // so e.g. for [min, neutr., max] values [1, 2, 128] this would result in [0, 0.0081, 1]
   const minZoom = device?.minZoom ?? 1
   const maxZoom = Math.min(device?.maxZoom ?? 1, MAX_ZOOM_FACTOR)
 
-  const cameraAnimatedProps = useAnimatedProps(() => {
+  const cameraAnimatedProps = useAnimatedProps<CameraProps>(() => {
     const z = Math.max(Math.min(zoom.value, maxZoom), minZoom)
     return {
       zoom: z,
@@ -93,7 +102,6 @@ export function CameraPage({ navigation }: Props): React.ReactElement {
     },
     [isPressingButton],
   )
-  // Camera callbacks
   const onError = useCallback((error: CameraRuntimeError) => {
     console.error(error)
   }, [])
@@ -120,21 +128,26 @@ export function CameraPage({ navigation }: Props): React.ReactElement {
   //#endregion
 
   //#region Tap Gesture
+  const onFocusTap = useCallback(
+    ({ nativeEvent: event }: GestureResponderEvent) => {
+      if (!device?.supportsFocus) return
+      camera.current?.focus({
+        x: event.locationX,
+        y: event.locationY,
+      })
+    },
+    [device?.supportsFocus],
+  )
   const onDoubleTap = useCallback(() => {
     onFlipCameraPressed()
   }, [onFlipCameraPressed])
   //#endregion
 
   //#region Effects
-  const neutralZoom = device?.neutralZoom ?? 1
   useEffect(() => {
-    // Run everytime the neutralZoomScaled value changes. (reset zoom when device changes)
-    zoom.value = neutralZoom
-  }, [neutralZoom, zoom])
-
-  useEffect(() => {
-    Camera.getMicrophonePermissionStatus().then((status) => setHasMicrophonePermission(status === 'granted'))
-  }, [])
+    // Reset zoom to it's default everytime the `device` changes.
+    zoom.value = device?.neutralZoom ?? 1
+  }, [zoom, device])
   //#endregion
 
   //#region Pinch to Zoom Gesture
@@ -161,45 +174,68 @@ export function CameraPage({ navigation }: Props): React.ReactElement {
     console.log(`Camera: ${device?.name} | Format: ${f}`)
   }, [device?.name, format, fps])
 
+  useEffect(() => {
+    location.requestPermission()
+  }, [location])
+
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet'
 
-    console.log(`${frame.timestamp}: ${frame.width}x${frame.height} ${frame.pixelFormat} Frame (${frame.orientation})`)
-    examplePlugin(frame)
-    exampleKotlinSwiftPlugin(frame)
+    runAtTargetFps(10, () => {
+      'worklet'
+      console.log(`${frame.timestamp}: ${frame.width}x${frame.height} ${frame.pixelFormat} Frame (${frame.orientation})`)
+      examplePlugin(frame)
+      exampleKotlinSwiftPlugin(frame)
+    })
   }, [])
+
+  const videoHdr = format?.supportsVideoHdr && enableHdr
+  const photoHdr = format?.supportsPhotoHdr && enableHdr && !videoHdr
 
   return (
     <View style={styles.container}>
-      {device != null && (
+      {device != null ? (
         <PinchGestureHandler onGestureEvent={onPinchGesture} enabled={isActive}>
-          <Reanimated.View style={StyleSheet.absoluteFill}>
+          <Reanimated.View onTouchEnd={onFocusTap} style={StyleSheet.absoluteFill}>
             <TapGestureHandler onEnded={onDoubleTap} numberOfTaps={2}>
               <ReanimatedCamera
-                ref={camera}
                 style={StyleSheet.absoluteFill}
                 device={device}
-                format={format}
-                fps={fps}
-                photoHdr={enableHdr}
-                videoHdr={enableHdr}
-                lowLightBoost={device.supportsLowLightBoost && enableNightMode}
                 isActive={isActive}
+                ref={camera}
                 onInitialized={onInitialized}
                 onError={onError}
+                onStarted={() => console.log('Camera started!')}
+                onStopped={() => console.log('Camera stopped!')}
+                onPreviewStarted={() => console.log('Preview started!')}
+                onPreviewStopped={() => console.log('Preview stopped!')}
+                onOutputOrientationChanged={(o) => console.log(`Output orientation changed to ${o}!`)}
+                onPreviewOrientationChanged={(o) => console.log(`Preview orientation changed to ${o}!`)}
+                onUIRotationChanged={(degrees) => console.log(`UI Rotation changed: ${degrees}°`)}
+                format={format}
+                fps={fps}
+                photoHdr={photoHdr}
+                videoHdr={videoHdr}
+                photoQualityBalance="quality"
+                lowLightBoost={device.supportsLowLightBoost && enableNightMode}
                 enableZoomGesture={false}
                 animatedProps={cameraAnimatedProps}
                 exposure={0}
                 enableFpsGraph={true}
-                orientation="portrait"
+                outputOrientation="device"
                 photo={true}
                 video={true}
-                audio={hasMicrophonePermission}
+                audio={microphone.hasPermission}
+                enableLocation={location.hasPermission}
                 frameProcessor={frameProcessor}
               />
             </TapGestureHandler>
           </Reanimated.View>
         </PinchGestureHandler>
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.text}>Your phone does not have a Camera.</Text>
+        </View>
       )}
 
       <CaptureButton
@@ -280,5 +316,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 })

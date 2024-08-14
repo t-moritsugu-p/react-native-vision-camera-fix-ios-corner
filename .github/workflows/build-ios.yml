@@ -6,14 +6,12 @@ on:
       - main
     paths:
       - '.github/workflows/build-ios.yml'
-      - 'package/cpp/**'
       - 'package/ios/**'
       - 'package/*.podspec'
       - 'package/example/ios/**'
   pull_request:
     paths:
       - '.github/workflows/build-ios.yml'
-      - 'package/cpp/**'
       - 'package/ios/**'
       - 'package/*.podspec'
       - 'package/example/ios/**'
@@ -30,15 +28,15 @@ jobs:
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
       - name: Restore node_modules from cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: yarn-cache
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-with-fps-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
+            ${{ runner.os }}-with-fps-yarn-
       - name: Install node_modules for example/
         run: yarn install --frozen-lockfile --cwd ..
 
@@ -49,19 +47,17 @@ jobs:
       - name: Setup Ruby (bundle)
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 2.6.10
+          ruby-version: 2.7.2
           bundler-cache: true
+          working-directory: package/example/ios
 
       - name: Restore Pods cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: |
-            package/example/ios/Pods
-            ~/Library/Caches/CocoaPods
-            ~/.cocoapods
-          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          path: package/example/ios/Pods
+          key: ${{ runner.os }}-with-fps-pods-${{ hashFiles('**/Podfile.lock', '**/Gemfile.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pods-
+            ${{ runner.os }}-with-fps-pods-
       - name: Install Pods
         run: pod install
       - name: Install xcpretty
@@ -74,7 +70,7 @@ jobs:
           -scheme VisionCameraExample \
           -sdk iphonesimulator \
           -configuration Debug \
-          -destination 'platform=iOS Simulator,name=iPhone 11 Pro' \
+          -destination 'platform=iOS Simulator,name=iPhone 15' \
           build \
           CODE_SIGNING_ALLOWED=NO | xcpretty"
 
@@ -89,19 +85,19 @@ jobs:
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
       - name: Restore node_modules from cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: yarn-cache
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-without-fps-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
+            ${{ runner.os }}-without-fps-yarn-
       - name: Install node_modules for example/
         run: yarn install --frozen-lockfile --cwd ..
-      - name: Remove react-native-worklets-core
-        run: yarn remove react-native-worklets-core --cwd ..
+      - name: Remove worklets, skia and reanimated
+        run: yarn remove react-native-worklets-core @shopify/react-native-skia react-native-reanimated --cwd ..
 
       - name: Restore buildcache
         uses: mikehardy/buildcache-action@v2
@@ -110,19 +106,17 @@ jobs:
       - name: Setup Ruby (bundle)
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 2.6.10
+          ruby-version: 2.7.2
           bundler-cache: true
+          working-directory: package/example/ios
 
       - name: Restore Pods cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: |
-            package/example/ios/Pods
-            ~/Library/Caches/CocoaPods
-            ~/.cocoapods
-          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          path: package/example/ios/Pods
+          key: ${{ runner.os }}-without-fps-pods-${{ hashFiles('**/Podfile.lock', '**/Gemfile.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pods-
+            ${{ runner.os }}-without-fps-pods-
       - name: Install Pods
         run: pod install
       - name: Install xcpretty
@@ -135,6 +129,6 @@ jobs:
           -scheme VisionCameraExample \
           -sdk iphonesimulator \
           -configuration Debug \
-          -destination 'platform=iOS Simulator,name=iPhone 11 Pro' \
+          -destination 'platform=iOS Simulator,name=iPhone 15' \
           build \
           CODE_SIGNING_ALLOWED=NO | xcpretty"

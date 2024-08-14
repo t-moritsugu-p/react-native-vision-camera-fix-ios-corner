@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { CameraPermissionRequestResult, CameraPermissionStatus } from '../Camera'
 import { Camera } from '../Camera'
+import { AppState } from 'react-native'
 
 interface PermissionState {
   /**
@@ -12,6 +14,33 @@ interface PermissionState {
    * @returns Whether the specified permission has now been granted, or not.
    */
   requestPermission: () => Promise<boolean>
+}
+
+function usePermission(get: () => CameraPermissionStatus, request: () => Promise<CameraPermissionRequestResult>): PermissionState {
+  const [hasPermission, setHasPermission] = useState(() => get() === 'granted')
+
+  const requestPermission = useCallback(async () => {
+    const result = await request()
+    const hasPermissionNow = result === 'granted'
+    setHasPermission(hasPermissionNow)
+    return hasPermissionNow
+  }, [request])
+
+  useEffect(() => {
+    // Refresh permission when app state changes, as user might have allowed it in Settings
+    const listener = AppState.addEventListener('change', () => {
+      setHasPermission(get() === 'granted')
+    })
+    return () => listener.remove()
+  }, [get])
+
+  return useMemo(
+    () => ({
+      hasPermission,
+      requestPermission,
+    }),
+    [hasPermission, requestPermission],
+  )
 }
 
 /**
@@ -31,23 +60,7 @@ interface PermissionState {
  * ```
  */
 export function useCameraPermission(): PermissionState {
-  const [hasPermission, setHasPermission] = useState(false)
-
-  const requestPermission = useCallback(async () => {
-    const result = await Camera.requestCameraPermission()
-    const hasPermissionNow = result === 'granted'
-    setHasPermission(hasPermissionNow)
-    return hasPermissionNow
-  }, [])
-
-  useEffect(() => {
-    Camera.getCameraPermissionStatus().then((s) => setHasPermission(s === 'granted'))
-  }, [])
-
-  return {
-    hasPermission,
-    requestPermission,
-  }
+  return usePermission(Camera.getCameraPermissionStatus, Camera.requestCameraPermission)
 }
 
 /**
@@ -65,21 +78,23 @@ export function useCameraPermission(): PermissionState {
  * ```
  */
 export function useMicrophonePermission(): PermissionState {
-  const [hasPermission, setHasPermission] = useState(false)
+  return usePermission(Camera.getMicrophonePermissionStatus, Camera.requestMicrophonePermission)
+}
 
-  const requestPermission = useCallback(async () => {
-    const result = await Camera.requestMicrophonePermission()
-    const hasPermissionNow = result === 'granted'
-    setHasPermission(hasPermissionNow)
-    return hasPermissionNow
-  }, [])
-
-  useEffect(() => {
-    Camera.getMicrophonePermissionStatus().then((s) => setHasPermission(s === 'granted'))
-  }, [])
-
-  return {
-    hasPermission,
-    requestPermission,
-  }
+/**
+ * Returns whether the user has granted permission to use the Location, or not.
+ *
+ * If the user doesn't grant Location Permission, you can use the `<Camera>` but you cannot
+ * capture photos or videos with GPS EXIF tags (the `location={..}` prop).
+ *
+ * @example
+ * ```tsx
+ * const { hasPermission, requestPermission } = useLocationPermission()
+ * const canCaptureLocation = hasPermission
+ *
+ * return <Camera photo={true} location={canCaptureLocation} />
+ * ```
+ */
+export function useLocationPermission(): PermissionState {
+  return usePermission(Camera.getLocationPermissionStatus, Camera.requestLocationPermission)
 }

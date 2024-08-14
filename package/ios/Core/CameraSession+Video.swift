@@ -10,6 +10,8 @@ import AVFoundation
 import Foundation
 import UIKit
 
+private let INSUFFICIENT_STORAGE_ERROR_CODE = -11807
+
 extension CameraSession {
   /**
    Starts a video + audio recording with a custom Asset Writer.
@@ -20,7 +22,7 @@ extension CameraSession {
     // Run on Camera Queue
     CameraQueues.cameraQueue.async {
       let start = DispatchTime.now()
-      ReactLogger.log(level: .info, message: "Starting Video recording...")
+      VisionLogger.log(level: .info, message: "Starting Video recording...")
 
       // Get Video Output
       guard let videoOutput = self.videoOutput else {
@@ -43,25 +45,29 @@ extension CameraSession {
               self.deactivateAudioSession()
             }
           }
-          // Reset flash
-          if options.flash != .off {
-            // Set torch mode back to what it was before if we used it for the video flash.
-            self.configure { config in
-              let torch = self.configuration?.torch ?? .off
-              config.torch = torch
-            }
-          }
         }
 
-        self.isRecording = false
         self.recordingSession = nil
-        ReactLogger.log(level: .info, message: "RecordingSession finished with status \(status.descriptor).")
+
+        if self.didCancelRecording {
+          VisionLogger.log(level: .info, message: "RecordingSession finished because the recording was canceled.")
+          onError(.capture(.recordingCanceled))
+          do {
+            VisionLogger.log(level: .info, message: "Deleting temporary video file...")
+            try FileManager.default.removeItem(at: recordingSession.url)
+          } catch {
+            self.delegate?.onError(.capture(.fileError(cause: error)))
+          }
+          return
+        }
+
+        VisionLogger.log(level: .info, message: "RecordingSession finished with status \(status.descriptor).")
 
         if let error = error as NSError? {
-          ReactLogger.log(level: .error, message: "RecordingSession Error \(error.code): \(error.description)")
+          VisionLogger.log(level: .error, message: "RecordingSession Error \(error.code): \(error.description)")
           // Something went wrong, we have an error
-          if error.domain == "capture/aborted" {
-            onError(.capture(.aborted))
+          if error.code == INSUFFICIENT_STORAGE_ERROR_CODE {
+            onError(.capture(.insufficientStorage))
           } else {
             onError(.capture(.unknown(message: "An unknown recording error occured! \(error.code) \(error.description)")))
           }
@@ -69,7 +75,8 @@ extension CameraSession {
           if status == .completed {
             // Recording was successfully saved
             let video = Video(path: recordingSession.url.absoluteString,
-                              duration: recordingSession.duration)
+                              duration: recordingSession.duration,
+                              size: recordingSession.size)
             onVideoRecorded(video)
           } else {
             // Recording wasn't saved and we don't have an error either.
@@ -78,29 +85,25 @@ extension CameraSession {
         }
       }
 
-      // Create temporary file
-      let errorPointer = ErrorPointer(nilLiteral: ())
-      let fileExtension = options.fileType.descriptor ?? "mov"
-      guard let tempFilePath = RCTTempFilePath(fileExtension, errorPointer) else {
-        let message = errorPointer?.pointee?.description
-        onError(.capture(.createTempFileError(message: message)))
-        return
-      }
-
-      ReactLogger.log(level: .info, message: "Will record to temporary file: \(tempFilePath)")
-      let tempURL = URL(string: "file://\(tempFilePath)")!
+      VisionLogger.log(level: .info, message: "Starting recording into file: \(options.path)")
 
       do {
+        // Orientation is relative to our current output orientation
+        let orientation = self.outputOrientation.relativeTo(orientation: videoOutput.orientation)
+
         // Create RecordingSession for the temp file
-        let recordingSession = try RecordingSession(url: tempURL,
+        let recordingSession = try RecordingSession(url: options.path,
                                                     fileType: options.fileType,
+                                                    metadataProvider: self.metadataProvider,
+                                                    clock: self.captureSession.clock,
+                                                    orientation: orientation,
                                                     completion: onFinish)
 
         // Init Audio + Activate Audio Session (optional)
         if enableAudio,
            let audioOutput = self.audioOutput,
            let audioInput = self.audioDeviceInput {
-          ReactLogger.log(level: .trace, message: "Enabling Audio for Recording...")
+          VisionLogger.log(level: .info, message: "Enabling Audio for Recording...")
           // Activate Audio Session asynchronously
           CameraQueues.audioQueue.async {
             do {
@@ -112,29 +115,25 @@ extension CameraSession {
 
           // Initialize audio asset writer
           let audioSettings = audioOutput.recommendedAudioSettingsForAssetWriter(writingTo: options.fileType)
-          recordingSession.initializeAudioWriter(withSettings: audioSettings,
-                                                 format: audioInput.device.activeFormat.formatDescription)
+          try recordingSession.initializeAudioTrack(withSettings: audioSettings,
+                                                    format: audioInput.device.activeFormat.formatDescription)
         }
 
         // Init Video
         let videoSettings = try videoOutput.recommendedVideoSettings(forOptions: options)
-        recordingSession.initializeVideoWriter(withSettings: videoSettings)
+        try recordingSession.initializeVideoTrack(withSettings: videoSettings)
 
         // start recording session with or without audio.
-        // Use Video [AVCaptureSession] clock as a timebase - all other sessions (here; audio) have to be synced to that Clock.
-        try recordingSession.start(clock: self.captureSession.clock)
+        try recordingSession.start()
+        self.didCancelRecording = false
         self.recordingSession = recordingSession
-        self.isRecording = true
 
         let end = DispatchTime.now()
-        ReactLogger.log(level: .info, message: "RecordingSesssion started in \(Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000)ms!")
+        VisionLogger.log(level: .info, message: "RecordingSesssion started in \(Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000)ms!")
+      } catch let error as CameraError {
+        onError(error)
       } catch let error as NSError {
-        if let error = error as? CameraError {
-          onError(error)
-        } else {
-          onError(.capture(.createRecorderError(message: "RecordingSession failed with unknown error: \(error.description)")))
-        }
-        return
+        onError(.capture(.createRecorderError(message: "RecordingSession failed with unknown error: \(error.description)")))
       }
     }
   }
@@ -148,12 +147,18 @@ extension CameraSession {
         guard let recordingSession = self.recordingSession else {
           throw CameraError.capture(.noRecordingInProgress)
         }
-        // Use Video [AVCaptureSession] clock as a timebase - all other sessions (here; audio) have to be synced to that Clock.
-        recordingSession.stop(clock: self.captureSession.clock)
-        // There might be late frames, so maybe we need to still provide more Frames to the RecordingSession. Let's keep isRecording true for now.
+        recordingSession.stop()
         return nil
       }
     }
+  }
+
+  /**
+   Cancels an active recording.
+   */
+  func cancelRecording(promise: Promise) {
+    didCancelRecording = true
+    stopRecording(promise: promise)
   }
 
   /**
@@ -162,11 +167,10 @@ extension CameraSession {
   func pauseRecording(promise: Promise) {
     CameraQueues.cameraQueue.async {
       withPromise(promise) {
-        guard self.recordingSession != nil else {
-          // there's no active recording!
+        guard let recordingSession = self.recordingSession else {
           throw CameraError.capture(.noRecordingInProgress)
         }
-        self.isRecording = false
+        recordingSession.pause()
         return nil
       }
     }
@@ -178,11 +182,10 @@ extension CameraSession {
   func resumeRecording(promise: Promise) {
     CameraQueues.cameraQueue.async {
       withPromise(promise) {
-        guard self.recordingSession != nil else {
-          // there's no active recording!
+        guard let recordingSession = self.recordingSession else {
           throw CameraError.capture(.noRecordingInProgress)
         }
-        self.isRecording = true
+        recordingSession.resume()
         return nil
       }
     }

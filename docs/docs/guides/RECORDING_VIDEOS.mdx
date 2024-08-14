@@ -64,7 +64,7 @@ To stop the video recording, you can call [`stopRecording(...)`](/docs/api/class
 await camera.current.stopRecording()
 ```
 
-Once a recording has been stopped, the `onRecordingFinished` callback passed to the [`stopRecording(...)`](/docs/api/classes/Camera#stoprecording) function will be invoked with a [`VideoFile`](/docs/api/interfaces/VideoFile) which you can then use to display in a [`<Video>`](https://github.com/react-native-video/react-native-video) component, uploaded to a backend, or saved to the Camera Roll using [react-native-cameraroll](https://github.com/react-native-cameraroll/react-native-cameraroll).
+Once a recording has been stopped, the `onRecordingFinished` callback passed to the [`startRecording(...)`](/docs/api/classes/Camera#startrecording) function will be invoked with a [`VideoFile`](/docs/api/interfaces/VideoFile) which you can then use to display in a [`<Video>`](https://github.com/react-native-video/react-native-video) component, uploaded to a backend, or saved to the Camera Roll using [react-native-cameraroll](https://github.com/react-native-cameraroll/react-native-cameraroll).
 
 ### Pause/Resume
 
@@ -74,6 +74,14 @@ To pause/resume the recordings, you can use [`pauseRecording()`](/docs/api/class
 await camera.current.pauseRecording()
 ...
 await camera.current.resumeRecording()
+```
+
+### Cancel
+
+To cancel the recording, you can use [`cancelRecording()`](/docs/api/classes/Camera#cancelrecording), which will stop the recording, delete the temporary video file and call the `startRecording`'s [`onRecordingError`](/docs/api/interfaces/RecordVideoOptions#onrecordingerror) callback with a `capture/recording-canceled` error.
+
+```ts
+await camera.current.cancelRecording()
 ```
 
 ### Flash
@@ -102,6 +110,10 @@ camera.current.startRecording({
   videoCodec: 'h265'
 })
 ```
+
+:::tip
+If the device does not support `h265`, VisionCamera will automatically fall-back to a supported codec like `h264` instead.
+:::
 
 ### Video Bit Rate
 
@@ -158,6 +170,16 @@ camera.current.startRecording({
   videoBitRate: bitRate // Mbps
 })
 ```
+
+### Video Frame Rate (FPS)
+
+The resulting video will be recorded at the frame rate provided to the [`fps`](/docs/api/interfaces/CameraProps#fps) prop.
+
+```tsx
+<Camera {...props} fps={60} />
+```
+
+See [FPS](formats#fps) for more information.
 
 ## Saving the Video to the Camera Roll
 

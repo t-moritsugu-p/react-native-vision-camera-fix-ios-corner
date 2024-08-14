@@ -34,14 +34,14 @@ To understand a bit more about camera formats, you first need to understand a fe
   * 4k Photos, 1080p Videos, 240 FPS (ultra high FPS/slow motion)
   * 720p Photos, 720p Videos, 30 FPS (smaller buffers/e.g. faster face detection)
 * Each app has different requirements, so the format filtering is up to you.
+* The `videoResolution` and `videoAspectRatio` options also affect the preview, as preview is also running in the video stream.
 
 To get all available formats, simply use the `CameraDevice`'s [`formats` property](/docs/api/interfaces/CameraDevice#formats).  These are a [CameraFormat's](/docs/api/interfaces/CameraDeviceFormat) props:
 
 - [`photoHeight`](/docs/api/interfaces/CameraDeviceFormat#photoheight)/[`photoWidth`](/docs/api/interfaces/CameraDeviceFormat#photoWidth): The resolution that will be used for taking photos. Choose a format with your desired resolution.
-- [`videoHeight`](/docs/api/interfaces/CameraDeviceFormat#videoheight)/[`videoWidth`](/docs/api/interfaces/CameraDeviceFormat#videoWidth): The resolution that will be used for recording videos. Choose a format with your desired resolution.
-- [`minFps`](/docs/api/interfaces/CameraDeviceFormat#minfps)/[`maxFps`](/docs/api/interfaces/CameraDeviceFormat#maxfps): A range of possible values for the `fps` property. For example, if your format has `minFps: 1` and `maxFps: 60`, you can either use `fps={30}`, `fps={60}` or any other value in between for recording videos.
+- [`videoHeight`](/docs/api/interfaces/CameraDeviceFormat#videoheight)/[`videoWidth`](/docs/api/interfaces/CameraDeviceFormat#videoWidth): The resolution that will be used for recording videos and streaming into frame processors. This also affects the preview's aspect ratio. Choose a format with your desired resolution.
+- [`minFps`](/docs/api/interfaces/CameraDeviceFormat#minfps)/[`maxFps`](/docs/api/interfaces/CameraDeviceFormat#maxfps): A range of possible values for the `fps` property. For example, if your format has `minFps: 1` and `maxFps: 60`, you can either use `fps={30}`, `fps={60}` or any other value in between for recording videos and streaming into frame processors.
 - [`videoStabilizationModes`](/docs/api/interfaces/CameraDeviceFormat#videostabilizationmodes): All supported Video Stabilization Modes, digital and optical. If this specific format contains your desired [`VideoStabilizationMode`](/docs/api/#videostabilizationmode), you can pass it to your `<Camera>` via the [`videoStabilizationMode` property](/docs/api/interfaces/CameraProps#videoStabilizationMode).
-- [`pixelFormats`](/docs/api/interfaces/CameraDeviceFormat#pixelformats): All supported Pixel Formats. If this specific format contains your desired [`PixelFormat`](/docs/api/#PixelFormat), you can pass it to your `<Camera>` via the [`pixelFormat` property](/docs/api/interfaces/CameraProps#pixelFormat).
 - [`supportsVideoHdr`](/docs/api/interfaces/CameraDeviceFormat#supportsvideohdr): Whether this specific format supports true 10-bit HDR for video capture. If this is `true`, you can enable `videoHdr` on your `<Camera>`.
 - [`supportsPhotoHdr`](/docs/api/interfaces/CameraDeviceFormat#supportsphotohdr): Whether this specific format supports HDR for photo capture. It will use multiple captures to fuse over-exposed and under-exposed Images together to form one HDR photo. If this is `true`, you can enable `photoHdr` on your `<Camera>`.
 - [`supportsDepthCapture`](/docs/api/interfaces/CameraDeviceFormat#supportsdepthcapture): Whether this specific format supports depth data capture. For devices like the TrueDepth/LiDAR cameras, this will always be true.
@@ -61,6 +61,7 @@ You can either find a matching format manually by looping through your `CameraDe
 ```ts
 const device = ...
 const format = useCameraFormat(device, [
+  { videoAspectRatio: 16 / 9 },
   { videoResolution: { width: 3048, height: 2160 } },
   { fps: 60 }
 ])
@@ -72,6 +73,7 @@ const format = useCameraFormat(device, [
 ```ts
 const device = ...
 const format = getCameraFormat(device, [
+  { videoAspectRatio: 16 / 9 },
   { videoResolution: { width: 3048, height: 2160 } },
   { fps: 60 }
 ])
@@ -179,13 +181,21 @@ const format = getCameraFormat(device, Templates.Snapchat)
 
 ## Camera Props
 
-The `Camera` View provides a few props that depend on the specified `format`. For example, you can only set the `fps` prop to a value that is supported by the current `format`. So if you have a format that supports 240 FPS, you can set the `fps` to `240`:
+The `Camera` View provides a few props that depend on the specified `format`.
+
+### FPS
+
+For example, a camera device might have a 1080p and a 4k format, but the 4k one can only stream at 60 FPS, while the 1080p format can do 240 FPS.
+
+To find a 240 FPS format we can use the [`useCameraFormat(..)`](/docs/api#usecameraformat) hook to find a suitable format, then pass it's maximum supported FPS as the Camera's target FPS:
 
 ```tsx
 function App() {
-  // ...
-  const format = ...
-  const fps = format.maxFps >= 240 ? 240 : format.maxFps
+  const device = ...
+  const format = useCameraFormat(device, [
+    { fps: 240 }
+  ])
+  const fps = format.maxFps // <-- 240 FPS, or lower if 240 FPS is not available
 
   return (
     <Camera
@@ -198,16 +208,39 @@ function App() {
 }
 ```
 
+Setting [`fps`](/docs/api/interfaces/CameraProps#fps) to a single number will configure the Camera to use a fixed FPS rate.
+
+Under low/dark lighting conditions, a Camera could throttle it's FPS rate to receive more light, which would result in **higher quality and better exposed photos and videos**.
+VisionCamera provides an API to set a variable FPS rate, which internally automatically adjusts FPS rate depending on lighting conditions.
+To use this, simply set [`fps`](/docs/api/interfaces/CameraProps#fps) to a tuple (`[min, max]`).
+
+For example, we could target 30 FPS, but allow the Camera to throttle down to 20 FPS under low lighting conditions:
+
+```tsx
+function App() {
+  // ...
+  const format = ...
+  const minFps = Math.max(format.minFps, 20)
+  const maxFps = Math.min(format.maxFps, 30)
+
+  return (
+    <Camera
+      {...props}
+      fps={[minFps, maxFps]}
+    />
+  )
+}
+```
+
+### Other Props
+
 Other props that depend on the `format`:
 
-* `fps`: Specifies the frame rate to use
 * `videoHdr`: Enables HDR video capture and preview
 * `photoHdr`: Enables HDR photo capture
-* `lowLightBoost`: Enables a night-mode/low-light-boost for photo or video capture and preview
 * `videoStabilizationMode`: Specifies the video stabilization mode to use for the video pipeline
-* `pixelFormat`: Specifies the pixel format to use for the video pipeline
 
 
 <br />
 
-#### 🚀 Next section: [Taking Photos](./taking-photos)
+#### 🚀 Next section: [Preview](./preview)

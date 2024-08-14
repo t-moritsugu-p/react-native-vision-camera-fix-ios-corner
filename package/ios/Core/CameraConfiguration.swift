@@ -11,7 +11,7 @@ import Foundation
 
 // MARK: - CameraConfiguration
 
-class CameraConfiguration {
+final class CameraConfiguration {
   // pragma MARK: Configuration Props
 
   // Input
@@ -21,18 +21,23 @@ class CameraConfiguration {
   var photo: OutputConfiguration<Photo> = .disabled
   var video: OutputConfiguration<Video> = .disabled
   var codeScanner: OutputConfiguration<CodeScanner> = .disabled
+  var isMirrored = false
+
+  // Location
+  var enableLocation = false
 
   // Video Stabilization
   var videoStabilizationMode: VideoStabilizationMode = .off
 
   // Orientation
-  var orientation: Orientation = .portrait
+  var outputOrientation: OutputOrientation = .device
 
   // Format
   var format: CameraDeviceFormat?
 
   // Side-Props
-  var fps: Int32?
+  var minFps: Int32?
+  var maxFps: Int32?
   var enableLowLightBoost = false
   var torch: Torch = .off
 
@@ -55,10 +60,13 @@ class CameraConfiguration {
       photo = other.photo
       video = other.video
       codeScanner = other.codeScanner
+      isMirrored = other.isMirrored
+      enableLocation = other.enableLocation
       videoStabilizationMode = other.videoStabilizationMode
-      orientation = other.orientation
+      outputOrientation = other.outputOrientation
       format = other.format
-      fps = other.fps
+      minFps = other.minFps
+      maxFps = other.maxFps
       enableLowLightBoost = other.enableLowLightBoost
       torch = other.torch
       zoom = other.zoom
@@ -72,6 +80,14 @@ class CameraConfiguration {
 
   // pragma MARK: Types
 
+  /**
+   Throw this to abort calls to configure { ... } and apply no changes.
+   */
+  @frozen
+  enum AbortThrow: Error {
+    case abort
+  }
+
   struct Difference {
     let inputChanged: Bool
     let outputsChanged: Bool
@@ -84,6 +100,7 @@ class CameraConfiguration {
     let exposureChanged: Bool
 
     let audioSessionChanged: Bool
+    let locationChanged: Bool
 
     /**
      Returns `true` when props that affect the AVCaptureSession configuration (i.e. props that require beginConfiguration()) have changed.
@@ -105,17 +122,19 @@ class CameraConfiguration {
       // cameraId
       inputChanged = left?.cameraId != right.cameraId
       // photo, video, codeScanner
-      outputsChanged = inputChanged || left?.photo != right.photo || left?.video != right.video || left?.codeScanner != right.codeScanner
+      outputsChanged = inputChanged || left?.photo != right.photo || left?.video != right.video
+        || left?.codeScanner != right.codeScanner || left?.isMirrored != right.isMirrored
       // videoStabilizationMode
       videoStabilizationChanged = outputsChanged || left?.videoStabilizationMode != right.videoStabilizationMode
       // orientation
-      orientationChanged = outputsChanged || left?.orientation != right.orientation
+      orientationChanged = outputsChanged || left?.outputOrientation != right.outputOrientation
       // format (depends on cameraId)
       formatChanged = inputChanged || left?.format != right.format
       // side-props (depends on format)
-      sidePropsChanged = formatChanged || left?.fps != right.fps || left?.enableLowLightBoost != right.enableLowLightBoost
+      sidePropsChanged = formatChanged || left?.minFps != right.minFps || left?.maxFps != right.maxFps || left?.enableLowLightBoost != right.enableLowLightBoost
       // torch (depends on isActive)
-      torchChanged = left?.isActive != right.isActive || left?.torch != right.torch
+      let wasInactiveAndNeedsToEnableTorchAgain = left?.isActive == false && right.isActive == true && right.torch == .on
+      torchChanged = inputChanged || wasInactiveAndNeedsToEnableTorchAgain || left?.torch != right.torch
       // zoom (depends on format)
       zoomChanged = formatChanged || left?.zoom != right.zoom
       // exposure (depends on device)
@@ -123,9 +142,13 @@ class CameraConfiguration {
 
       // audio session
       audioSessionChanged = left?.audio != right.audio
+
+      // location
+      locationChanged = left?.enableLocation != right.enableLocation
     }
   }
 
+  @frozen
   enum OutputConfiguration<T: Equatable>: Equatable {
     case disabled
     case enabled(config: T)
@@ -146,7 +169,7 @@ class CameraConfiguration {
    A Photo Output configuration
    */
   struct Photo: Equatable {
-    var enableHighQualityPhotos = false
+    var qualityBalance: QualityBalance = .balanced
     var enableDepthData = false
     var enablePortraitEffectsMatte = false
   }
@@ -155,7 +178,7 @@ class CameraConfiguration {
    A Video Output configuration
    */
   struct Video: Equatable {
-    var pixelFormat: PixelFormat = .native
+    var pixelFormat: PixelFormat = .yuv
     var enableBufferCompression = false
     var enableHdr = false
     var enableFrameProcessor = false
@@ -183,25 +206,13 @@ extension CameraConfiguration.Video {
    If HDR is disabled, this will return whatever the user specified as a pixelFormat, or the most efficient format as a fallback.
    */
   func getPixelFormat(for videoOutput: AVCaptureVideoDataOutput) throws -> OSType {
-    // as per documentation, the first value is always the most efficient format
-    var defaultFormat = videoOutput.availableVideoPixelFormatTypes.first!
-    if enableBufferCompression {
-      // use compressed format instead if we enabled buffer compression
-      if defaultFormat == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange &&
-        videoOutput.availableVideoPixelFormatTypes.contains(kCVPixelFormatType_Lossy_420YpCbCr8BiPlanarVideoRange) {
-        // YUV 4:2:0 8-bit (limited video colors; compressed)
-        defaultFormat = kCVPixelFormatType_Lossy_420YpCbCr8BiPlanarVideoRange
-      }
-      if defaultFormat == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange &&
-        videoOutput.availableVideoPixelFormatTypes.contains(kCVPixelFormatType_Lossy_420YpCbCr8BiPlanarFullRange) {
-        // YUV 4:2:0 8-bit (full video colors; compressed)
-        defaultFormat = kCVPixelFormatType_Lossy_420YpCbCr8BiPlanarFullRange
-      }
-    }
+    let available = videoOutput.availableVideoPixelFormatTypes.map { $0.toString() }
+    VisionLogger.log(level: .info, message: "Available Pixel Formats: \(available), finding best match... " +
+      "(pixelFormat=\"\(pixelFormat)\", enableHdr={\(enableHdr)}, enableBufferCompression={\(enableBufferCompression)})")
 
     // If the user enabled HDR, we can only use the YUV 4:2:0 10-bit pixel format.
     if enableHdr == true {
-      guard pixelFormat == .native || pixelFormat == .yuv else {
+      guard pixelFormat == .yuv else {
         throw CameraError.format(.incompatiblePixelFormatWithHDR)
       }
 
@@ -221,35 +232,33 @@ extension CameraConfiguration.Video {
     }
 
     // If we don't use HDR, we can use any other custom pixel format.
+    var targetFormats: [OSType] = []
     switch pixelFormat {
     case .yuv:
       // YUV 4:2:0 8-bit (full/limited video colors; uncompressed)
-      var targetFormats = [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
-                           kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
+      targetFormats = [kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
+                       kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
       if enableBufferCompression {
         // YUV 4:2:0 8-bit (full/limited video colors; compressed)
         targetFormats.insert(kCVPixelFormatType_Lossy_420YpCbCr8BiPlanarVideoRange, at: 0)
         targetFormats.insert(kCVPixelFormatType_Lossy_420YpCbCr8BiPlanarFullRange, at: 0)
       }
-      guard let format = videoOutput.findPixelFormat(firstOf: targetFormats) else {
-        throw CameraError.device(.pixelFormatNotSupported)
-      }
-      return format
     case .rgb:
       // RGBA 8-bit (uncompressed)
-      var targetFormats = [kCVPixelFormatType_32BGRA]
+      targetFormats = [kCVPixelFormatType_32BGRA]
       if enableBufferCompression {
         // RGBA 8-bit (compressed)
         targetFormats.insert(kCVPixelFormatType_Lossy_32BGRA, at: 0)
       }
-      guard let format = videoOutput.findPixelFormat(firstOf: targetFormats) else {
-        throw CameraError.device(.pixelFormatNotSupported)
-      }
-      return format
-    case .native:
-      return defaultFormat
     case .unknown:
       throw CameraError.parameter(.invalid(unionName: "pixelFormat", receivedValue: "unknown"))
     }
+
+    guard let format = videoOutput.findPixelFormat(firstOf: targetFormats) else {
+      throw CameraError.device(.pixelFormatNotSupported(targetFormats: targetFormats,
+                                                        availableFormats: videoOutput.availableVideoPixelFormatTypes))
+    }
+    VisionLogger.log(level: .info, message: "Using PixelFormat: \(format.toString())...")
+    return format
   }
 }

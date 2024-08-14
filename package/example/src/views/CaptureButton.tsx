@@ -1,12 +1,8 @@
-import React, { useCallback, useMemo, useRef } from 'react'
-import { StyleSheet, View, ViewProps } from 'react-native'
-import {
-  PanGestureHandler,
-  PanGestureHandlerGestureEvent,
-  State,
-  TapGestureHandler,
-  TapGestureHandlerStateChangeEvent,
-} from 'react-native-gesture-handler'
+import React, { useCallback, useRef } from 'react'
+import type { ViewProps } from 'react-native'
+import { StyleSheet, View } from 'react-native'
+import type { PanGestureHandlerGestureEvent, TapGestureHandlerStateChangeEvent } from 'react-native-gesture-handler'
+import { PanGestureHandler, State, TapGestureHandler } from 'react-native-gesture-handler'
 import Reanimated, {
   cancelAnimation,
   Easing,
@@ -19,11 +15,8 @@ import Reanimated, {
   useSharedValue,
   withRepeat,
 } from 'react-native-reanimated'
-import type { Camera, PhotoFile, TakePhotoOptions, VideoFile } from 'react-native-vision-camera'
+import type { Camera, PhotoFile, VideoFile } from 'react-native-vision-camera'
 import { CAPTURE_BUTTON_SIZE, SCREEN_HEIGHT, SCREEN_WIDTH } from './../Constants'
-
-const PAN_GESTURE_HANDLER_FAIL_X = [-SCREEN_WIDTH, SCREEN_WIDTH]
-const PAN_GESTURE_HANDLER_ACTIVE_Y = [-2, 2]
 
 const START_RECORDING_DELAY = 200
 const BORDER_WIDTH = CAPTURE_BUTTON_SIZE * 0.1
@@ -58,15 +51,6 @@ const _CaptureButton: React.FC<Props> = ({
   const pressDownDate = useRef<Date | undefined>(undefined)
   const isRecording = useRef(false)
   const recordingProgress = useSharedValue(0)
-  const takePhotoOptions = useMemo<TakePhotoOptions>(
-    () => ({
-      qualityPrioritization: 'speed',
-      flash: flash,
-      quality: 90,
-      enableShutterSound: false,
-    }),
-    [flash],
-  )
   const isPressingButton = useSharedValue(false)
 
   //#region Camera Capture
@@ -75,12 +59,15 @@ const _CaptureButton: React.FC<Props> = ({
       if (camera.current == null) throw new Error('Camera ref is null!')
 
       console.log('Taking photo...')
-      const photo = await camera.current.takePhoto(takePhotoOptions)
+      const photo = await camera.current.takePhoto({
+        flash: flash,
+        enableShutterSound: false,
+      })
       onMediaCaptured(photo, 'photo')
     } catch (e) {
       console.error('Failed to take photo!', e)
     }
-  }, [camera, onMediaCaptured, takePhotoOptions])
+  }, [camera, flash, onMediaCaptured])
 
   const onStoppedRecording = useCallback(() => {
     isRecording.current = false
@@ -270,8 +257,8 @@ const _CaptureButton: React.FC<Props> = ({
         <PanGestureHandler
           enabled={enabled}
           ref={panHandler}
-          failOffsetX={PAN_GESTURE_HANDLER_FAIL_X}
-          activeOffsetY={PAN_GESTURE_HANDLER_ACTIVE_Y}
+          failOffsetX={[-SCREEN_WIDTH, SCREEN_WIDTH]}
+          activeOffsetY={[-2, 2]}
           onGestureEvent={onPanGestureEvent}
           simultaneousHandlers={tapHandler}>
           <Reanimated.View style={styles.flex}>

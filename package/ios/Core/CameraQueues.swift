@@ -9,7 +9,7 @@
 import Foundation
 
 @objc
-public class CameraQueues: NSObject {
+public final class CameraQueues: NSObject {
   /// The serial execution queue for camera configuration and setup.
   @objc public static let cameraQueue = DispatchQueue(label: "mrousavy/VisionCamera.main",
                                                       qos: .userInteractive,
@@ -37,4 +37,11 @@ public class CameraQueues: NSObject {
                                                      attributes: [],
                                                      autoreleaseFrequency: .inherit,
                                                      target: nil)
+
+  /// The serial execution queue for streaming location data.
+  @objc public static let locationQueue = DispatchQueue(label: "mrousavy/VisionCamera.location",
+                                                        qos: .utility,
+                                                        attributes: [],
+                                                        autoreleaseFrequency: .inherit,
+                                                        target: nil)
 }
