@@ -1391,16 +1391,16 @@ PODS:
     - ReactCommon/turbomodule/core
     - Yoga
   - SocketRocket (0.7.0)
-  - VisionCamera (4.5.0):
-    - VisionCamera/Core (= 4.5.0)
-    - VisionCamera/FrameProcessors (= 4.5.0)
-    - VisionCamera/React (= 4.5.0)
-  - VisionCamera/Core (4.5.0)
-  - VisionCamera/FrameProcessors (4.5.0):
+  - VisionCamera (0.0.10):
+    - VisionCamera/Core (= 0.0.10)
+    - VisionCamera/FrameProcessors (= 0.0.10)
+    - VisionCamera/React (= 0.0.10)
+  - VisionCamera/Core (0.0.10)
+  - VisionCamera/FrameProcessors (0.0.10):
     - React
     - React-callinvoker
     - react-native-worklets-core
-  - VisionCamera/React (4.5.0):
+  - VisionCamera/React (0.0.10):
     - React-Core
     - VisionCamera/FrameProcessors
   - Yoga (0.0.0)
@@ -1688,8 +1688,8 @@ SPEC CHECKSUMS:
   RNStaticSafeAreaInsets: 055ddbf5e476321720457cdaeec0ff2ba40ec1b8
   RNVectorIcons: 2a2f79274248390b80684ea3c4400bd374a15c90
   SocketRocket: abac6f5de4d4d62d24e11868d7a2f427e0ef940d
-  VisionCamera: c75705e486d3ba2e0e850e98aa314010f04e922d
-  Yoga: 2f71ecf38d934aecb366e686278102a51679c308
+  VisionCamera: 70d3dcd3d398260cb8b2027c0a0a48cb07f0b50d
+  Yoga: ae3c32c514802d30f687a04a6a35b348506d411f
 
 PODFILE CHECKSUM: 49584be049764895189f1f88ebc9769116621103
 

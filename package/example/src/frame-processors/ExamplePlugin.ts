@@ -1,5 +1,5 @@
-import type { Frame } from 'react-native-vision-camera'
-import { VisionCameraProxy } from 'react-native-vision-camera'
+import type { Frame } from '@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner'
+import { VisionCameraProxy } from '@t-mrtgu/react-native-vision-camera-fix-ios-codescan-corner'
 
 const plugin = VisionCameraProxy.initFrameProcessorPlugin('example_plugin', {})
 
