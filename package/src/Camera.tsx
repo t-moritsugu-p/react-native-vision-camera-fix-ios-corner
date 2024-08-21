@@ -19,7 +19,7 @@ import type {
   AverageFpsChangedEvent,
   NativeCameraViewProps,
   OnCodeScannedEvent,
-  OnErrorEvent,
+  OnErrorEvent, OnInitializeEvent,
   OutputOrientationChangedEvent,
   PreviewOrientationChangedEvent,
 } from './NativeCameraView'
@@ -519,8 +519,8 @@ export class Camera extends React.PureComponent<CameraProps, CameraState> {
     }
   }
 
-  private onInitialized(): void {
-    this.props.onInitialized?.()
+  private onInitialized(event: NativeSyntheticEvent<OnInitializeEvent>): void {
+    this.props.onInitialized?.(event.nativeEvent)
   }
 
   private onStarted(): void {

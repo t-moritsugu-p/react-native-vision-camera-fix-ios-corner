@@ -160,7 +160,14 @@ extension CameraSession {
     VisionLogger.log(level: .info, message: "Successfully configured all outputs!")
 
     // Notify delegate
-    delegate?.onSessionInitialized()
+    // delegate?.onSessionInitialized()
+    guard let device = self.videoDeviceInput?.device else {
+      delegate?.onSessionInitialized(initializedConfig: InitializedConfig(codeScannerFrame: CodeScannerFrame(width: 0, height: 0)))
+      return
+    }
+    let size = device.activeFormat.videoDimensions
+    delegate?.onSessionInitialized(initializedConfig: InitializedConfig(codeScannerFrame: CodeScannerFrame(width: size.width, height: size.height)))
+
   }
 
   // pragma MARK: Video Stabilization

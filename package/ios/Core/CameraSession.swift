@@ -329,4 +329,18 @@ final class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
       }
     }
   }
+  
+  struct InitializedConfig {
+    let codeScannerFrame: CodeScannerFrame
+
+    func toJSValue() -> [String: AnyHashable] {
+      return [
+        "codeScannerFrame": [
+          "width": codeScannerFrame.width,
+          "height": codeScannerFrame.height,
+        ],
+      ]
+    }
+  }
+
 }

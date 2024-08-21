@@ -322,9 +322,14 @@ public final class CameraView: UIView, CameraSessionDelegate, PreviewViewDelegat
     ])
   }
 
-  func onSessionInitialized() {
-    onInitializedEvent?([:])
+//  func onSessionInitialized() {
+//    onInitializedEvent?([:])
+//  }
+  
+  func onSessionInitialized(initializedConfig: CameraSession.InitializedConfig) {
+    onInitializedEvent?(initializedConfig.toJSValue())
   }
+
 
   func onCameraStarted() {
     onStartedEvent?([:])

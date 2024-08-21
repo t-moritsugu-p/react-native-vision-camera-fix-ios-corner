@@ -1,10 +1,13 @@
 import type { NativeSyntheticEvent } from 'react-native'
 import { requireNativeComponent } from 'react-native'
 import type { ErrorWithCause } from './CameraError'
-import type { CameraProps, OnShutterEvent } from './types/CameraProps'
+import type {CameraProps, OnShutterEvent} from './types/CameraProps'
 import type { Code, CodeScanner, CodeScannerFrame } from './types/CodeScanner'
 import type { Orientation } from './types/Orientation'
 
+export interface OnInitializeEvent {
+  codeScannerFrame: CodeScannerFrame
+}
 export interface OnCodeScannedEvent {
   codes: Code[]
   frame: CodeScannerFrame
@@ -45,7 +48,7 @@ export type NativeCameraViewProps = Omit<
   onViewReady: (event: NativeSyntheticEvent<void>) => void
   onAverageFpsChanged?: (event: NativeSyntheticEvent<AverageFpsChangedEvent>) => void
   // public events wrapped with NativeSyntheticEvent<T>
-  onInitialized?: (event: NativeSyntheticEvent<void>) => void
+  onInitialized?: (event: NativeSyntheticEvent<OnInitializeEvent>) => void
   onError?: (event: NativeSyntheticEvent<OnErrorEvent>) => void
   onCodeScanned?: (event: NativeSyntheticEvent<OnCodeScannedEvent>) => void
   onStarted?: (event: NativeSyntheticEvent<void>) => void

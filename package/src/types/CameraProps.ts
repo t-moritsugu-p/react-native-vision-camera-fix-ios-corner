@@ -1,7 +1,7 @@
 import type { ViewProps } from 'react-native'
 import type { CameraDevice, CameraDeviceFormat, VideoStabilizationMode } from './CameraDevice'
 import type { CameraRuntimeError } from '../CameraError'
-import type { CodeScanner } from './CodeScanner'
+import type {CodeScanner, CodeScannerFrame} from './CodeScanner'
 import type { Frame } from './Frame'
 import type { ISharedValue } from 'react-native-worklets-core'
 import type { SkImage } from '@shopify/react-native-skia'
@@ -25,6 +25,7 @@ export interface OnShutterEvent {
    */
   type: 'photo' | 'snapshot'
 }
+
 
 // TODO: Use RCT_ENUM_PARSER for stuff like torch, videoStabilizationMode, and orientation
 // TODO: Use Photo HostObject for stuff like depthData, portraitEffects, etc.
@@ -316,7 +317,9 @@ export interface CameraProps extends ViewProps {
    *
    * This is called everytime the {@linkcode device} or one of the outputs changes.
    */
-  onInitialized?: () => void
+  // onInitialized?: () => void
+  onInitialized?: (config: { codeScannerFrame: CodeScannerFrame }) => void
+
   /**
    * Called when the camera started the session. (`isActive={true}`)
    *
