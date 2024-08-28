@@ -50,7 +50,7 @@ Pod::Spec.new do |s|
   s.authors      = package["author"]
 
   s.platforms    = { :ios => "12.4" }
-  s.source       = { :git => "https://github.com/mrousavy/react-native-vision-camera.git", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/t-moritsugu-p/react-native-vision-camera-fix-ios-corner.git", :tag => "#{s.version}" }
 
   s.pod_target_xcconfig = {
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) VISION_CAMERA_ENABLE_FRAME_PROCESSORS=#{enableFrameProcessors}",
@@ -113,4 +113,7 @@ Pod::Spec.new do |s|
       fp.dependency "react-native-worklets-core"
     end
   end
+
+  s.dependency 'GoogleMLKit/BarcodeScanning', '~> 3.2.0'
+
 end

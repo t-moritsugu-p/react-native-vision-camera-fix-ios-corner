@@ -68,25 +68,39 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
   const [cameraHeight, setCameraHeight] = useState<number>(0);
 
   const [regionOfInterest, setRegionOfInterest]
-    = useState<{x:number, y: number, width: number, height: number}>({x: 0, y:0, width: 1, height: 1});
+    = useState<{x:number, y: number, width: number, height: number}>({x: 0, y:0, width: 1.0, height: 1.0});
 
-  // const onCameraInit = (config: { codeScannerFrame: CodeScannerFrame }) => {
-  const onCameraInit = () => {
-    // console.log('*********init*********');
-    // console.log(config);
-    // console.log('*********init end*********');
+  const onCameraInit = (config: { codeScannerFrame: CodeScannerFrame }) => {
+    console.log('*********init*********');
+    console.log(config);
+    console.log('*********init end*********');
 
-    // const frame = config.codeScannerFrame;
-    // if (frame.width === 0 || frame.height === 0) {
-    //   return;
-    // }
-    //
-    // if (frame.width > frame.height) {
-    //   const logicalHeight = frame.width / frame.height * WINDOW_WIDTH;
-    //   setCameraHeight(logicalHeight);
-    // } else {
-    //   const logicalHeight = frame.height / frame.width * WINDOW_WIDTH;
-    // }
+    const frame = config.codeScannerFrame;
+    if (frame.width === 0 || frame.height === 0) {
+      return;
+    }
+    let logicalHeight;
+    if (frame.width > frame.height) {
+      logicalHeight = frame.width / frame.height * WINDOW_WIDTH;
+      setCameraHeight(logicalHeight);
+    } else {
+      logicalHeight = frame.height / frame.width * WINDOW_WIDTH;
+      setCameraHeight(logicalHeight);
+    }
+    console.log(200.0 / logicalHeight)
+    setRegionOfInterest({
+      x: 0, // 縦方向
+      y: 0,
+      // width: 0.05,
+      // 縦方向がxとwidth
+      // width: 1.0,
+      // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
+      // width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.height,
+      width:  200.0 / logicalHeight,
+      height: 1.0
+    })
+
+
 
   }
 
@@ -136,22 +150,21 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
       const logicalHeight = frame.width / frame.height * WINDOW_WIDTH;
       yRatio = frame.width / logicalHeight;
       // console.log(logicalHeight + ' xr:' + xRatio + ' yr:' + yRatio)
-      if (frame.width !== 0 && frame.height !== 0 && cameraHeight !== logicalHeight) {
-        setCameraHeight(logicalHeight);
-        setRegionOfInterest({
-          x: 0, // 縦方向
-          y: 0,
-          // width: 0.05,
-          // 縦方向がxとwidth
-          // width: 1.0,
-          // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
-          width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.width,
-          height: 1.0
-        })
-        console.log('***********************')
-        console.log(regionOfInterest)
-        console.log('***********************')
-      }
+      // if (frame.width !== 0 && frame.height !== 0 && cameraHeight !== logicalHeight) {
+      //   setRegionOfInterest({
+      //     x: 0, // 縦方向
+      //     y: 0,
+      //     // width: 0.05,
+      //     // 縦方向がxとwidth
+      //     // width: 1.0,
+      //     // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
+      //     width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.width,
+      //     height: 1.0
+      //   })
+      //   console.log('***********************')
+      //   console.log(regionOfInterest)
+      //   console.log('***********************')
+      // }
 
     } else {
       xRatio = frame.width / WINDOW_WIDTH;
@@ -159,24 +172,23 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
       const logicalHeight = frame.height / frame.width * WINDOW_WIDTH;
       yRatio = frame.height / logicalHeight;
       // console.log(logicalHeight + ' xr:' + xRatio + ' yr:' + yRatio)
-      if (frame.width !== 0 && frame.height !== 0 && cameraHeight !== logicalHeight) {
-        console.log('***********************')
-        console.log(cameraHeight + ' ' + logicalHeight)
-        setCameraHeight(logicalHeight);
-        setRegionOfInterest({
-          x: 0, // 縦方向
-          y: 0,
-          // width: 0.05,
-          // 縦方向がxとwidth
-          // width: 1.0,
-          // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
-          width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.height,
-          height: 1.0
-        })
-
-        console.log(regionOfInterest)
-        console.log('***********************')
-      }
+      // if (frame.width !== 0 && frame.height !== 0 && cameraHeight !== logicalHeight) {
+      //   console.log('***********************')
+      //   console.log(cameraHeight + ' ' + logicalHeight)
+      //   setRegionOfInterest({
+      //     x: 0, // 縦方向
+      //     y: 0,
+      //     // width: 0.05,
+      //     // 縦方向がxとwidth
+      //     // width: 1.0,
+      //     // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
+      //     width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.height,
+      //     height: 1.0
+      //   })
+      //
+      //   console.log(regionOfInterest)
+      //   console.log('***********************')
+      // }
 
     }
 
@@ -237,17 +249,18 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
   const codeScanner = useCodeScanner({
     codeTypes: ['qr', 'ean-13', 'codabar'],
     onCodeScanned: onCodeScanned,
-    // regionOfInterest: regionOfInterest
-    regionOfInterest: {
-      x: 0, // 縦方向
-      y: 0,
-      // width: 0.05,
-      // 縦方向がxとwidth
-      width: 1.0,
-      // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
-      // width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.height,
-      height: 1.0
-    }
+    regionOfInterest,
+    // regionOfInterest: {
+    //   x: 0, // 縦方向
+    //   y: 0,
+    //   // width: 0.05,
+    //   // 縦方向がxとwidth
+    //   width: 0.1,
+    //   // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
+    //   // width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.height,
+    //   // height: 1.0
+    //   height: 1.0
+    // }
   })
 
 
@@ -259,8 +272,8 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
       {device != null && isFocused && (
         <TouchableOpacity
           // style={[styles.barcodeAreaWrapper, {height: cameraHeight.value}]}
-          // style={[styles.barcodeArea, {height: cameraHeight}]}
-          style={[styles.barcodeArea, {height: cameraHeight > 0? cameraHeight : '100%'}]}
+          style={[styles.barcodeArea, {height: cameraHeight}]}
+          // style={[styles.barcodeArea, {height: cameraHeight > 0? cameraHeight : '100%'}]}
           onPressOut={async (e) => {
             if (refCamera) {
               try {
@@ -279,11 +292,11 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
 
           <Camera
             // style={StyleSheet.absoluteFill}
-            // style={[styles.barcodeArea, {height: cameraHeight}]}
-            style={[styles.barcodeArea, {height: cameraHeight > 0? cameraHeight : '100%'}]}
+            style={[styles.barcodeArea, {height: cameraHeight}]}
+            // style={[styles.barcodeArea, {height: cameraHeight > 0? cameraHeight : '100%'}]}
             device={device}
             isActive={isActive}
-            codeScanner={codeScanner}
+            codeScanner={codeScanner} // regionOfInterestは初期化後に設定
             torch={torch ? 'on' : 'off'}
             // enableZoomGesture={true}
             ref={refCamera}
