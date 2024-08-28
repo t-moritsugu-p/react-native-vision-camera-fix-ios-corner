@@ -12,6 +12,8 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.io.Closeable
 
+private const val SCAN_INTERVAL_MILSEC = 200
+
 class CodeScannerPipeline(val configuration: CameraConfiguration.CodeScanner, val callback: CameraSession.Callback) :
   Closeable,
   Analyzer {
@@ -20,6 +22,7 @@ class CodeScannerPipeline(val configuration: CameraConfiguration.CodeScanner, va
   }
   private val scanner: BarcodeScanner
   private var isFirst: Boolean
+  private var prevScanMilsec: Long? = null
 
   init {
     val types = configuration.codeTypes.map { it.toBarcodeType() }
@@ -33,6 +36,14 @@ class CodeScannerPipeline(val configuration: CameraConfiguration.CodeScanner, va
   @OptIn(ExperimentalGetImage::class)
   override fun analyze(imageProxy: ImageProxy) {
     val image = imageProxy.image ?: throw InvalidImageTypeError()
+
+    // SCAN_INTERVAL_MILSECに制限
+    val now = System.currentTimeMillis()
+    if (prevScanMilsec != null && now - (prevScanMilsec as Long) < SCAN_INTERVAL_MILSEC) {
+      imageProxy.close()
+      return
+    }
+    prevScanMilsec = now
 
     try {
       val inputImage = InputImage.fromMediaImage(image, imageProxy.imageInfo.rotationDegrees)
