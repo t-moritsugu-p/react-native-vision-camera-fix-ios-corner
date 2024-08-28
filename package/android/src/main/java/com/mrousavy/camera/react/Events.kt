@@ -4,9 +4,9 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.uimanager.events.Event
 
-class CameraInitializedEvent(surfaceId: Int, viewId: Int) : Event<CameraInitializedEvent>(surfaceId, viewId) {
+class CameraInitializedEvent(surfaceId: Int, viewId: Int, private val data: WritableMap) : Event<CameraInitializedEvent>(surfaceId, viewId) {
   override fun getEventName() = "cameraInitialized"
-  override fun getEventData(): WritableMap = Arguments.createMap()
+  override fun getEventData(): WritableMap = data
 }
 
 class CameraStartedEvent(surfaceId: Int, viewId: Int) : Event<CameraStartedEvent>(surfaceId, viewId) {

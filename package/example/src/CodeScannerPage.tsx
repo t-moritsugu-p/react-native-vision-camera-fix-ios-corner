@@ -67,8 +67,8 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
   const WINDOW_WIDTH = Dimensions.get('window').width;
   const [cameraHeight, setCameraHeight] = useState<number>(0);
 
-  const [regionOfInterest, setRegionOfInterest]
-    = useState<{x:number, y: number, width: number, height: number}>({x: 0, y:0, width: 1.0, height: 1.0});
+  // const [regionOfInterest, setRegionOfInterest]
+  //   = useState<{x:number, y: number, width: number, height: number}>({x: 0, y:0, width: 1.0, height: 1.0});
 
   const onCameraInit = (config: { codeScannerFrame: CodeScannerFrame }) => {
     console.log('*********init*********');
@@ -79,28 +79,25 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
     if (frame.width === 0 || frame.height === 0) {
       return;
     }
-    let logicalHeight;
     if (frame.width > frame.height) {
-      logicalHeight = frame.width / frame.height * WINDOW_WIDTH;
+      const logicalHeight = frame.width / frame.height * WINDOW_WIDTH;
       setCameraHeight(logicalHeight);
     } else {
-      logicalHeight = frame.height / frame.width * WINDOW_WIDTH;
+      const logicalHeight = frame.height / frame.width * WINDOW_WIDTH;
       setCameraHeight(logicalHeight);
     }
-    console.log(200.0 / logicalHeight)
-    setRegionOfInterest({
-      x: 0, // 縦方向
-      y: 0,
-      // width: 0.05,
-      // 縦方向がxとwidth
-      // width: 1.0,
-      // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
-      // width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.height,
-      width:  200.0 / logicalHeight,
-      height: 1.0
-    })
-
-
+    // console.log(200.0 / logicalHeight)
+    // setRegionOfInterest({
+    //   x: 0, // 縦方向
+    //   y: 0,
+    //   // width: 0.05,
+    //   // 縦方向がxとwidth
+    //   // width: 1.0,
+    //   // width: 200.0 / 1180.0 * 1457.7 / 1920.0, // 200 / WINDOW_HEIGHT * logicalHeight / frameHeight
+    //   // width:  200.0 / WINDOW_HEIGHT * logicalHeight / frame.height,
+    //   width:  200.0 / logicalHeight,
+    //   height: 1.0
+    // })
 
   }
 
@@ -135,7 +132,7 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
 
     // console.log(codes[0]!.corners)
     // console.log(codes[0]!.value)
-    console.log(srcCodes);
+    // console.log(srcCodes);
     // console.log(WINDOW_WIDTH + ' ' + WINDOW_HEIGHT)
     // console.log(frame);
     // console.log(srcFrame);
@@ -249,7 +246,6 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
   const codeScanner = useCodeScanner({
     codeTypes: ['qr', 'ean-13', 'codabar'],
     onCodeScanned: onCodeScanned,
-    regionOfInterest,
     // regionOfInterest: {
     //   x: 0, // 縦方向
     //   y: 0,

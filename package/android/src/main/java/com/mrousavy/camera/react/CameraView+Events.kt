@@ -1,6 +1,7 @@
 package com.mrousavy.camera.react
 
 import android.util.Log
+import android.util.Size
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.WritableMap
@@ -14,11 +15,24 @@ import com.mrousavy.camera.core.types.CodeType
 import com.mrousavy.camera.core.types.Orientation
 import com.mrousavy.camera.core.types.ShutterType
 
-fun CameraView.invokeOnInitialized() {
+// fun CameraView.invokeOnInitialized() {
+fun CameraView.invokeOnInitialized(size: Size?) {
   Log.i(CameraView.TAG, "invokeOnInitialized()")
 
+  val frame = Arguments.createMap()
+  if (size != null) {
+    frame.putInt("width", size.width)
+    frame.putInt("height", size.height)
+  } else {
+    frame.putInt("width", 0)
+    frame.putInt("height", 0)
+  }
+  val data = Arguments.createMap()
+  data.putMap("codeScannerFrame", frame)
+
   val surfaceId = UIManagerHelper.getSurfaceId(this)
-  val event = CameraInitializedEvent(surfaceId, id)
+  val event = CameraInitializedEvent(surfaceId, id, data)
+
   this.sendEvent(event)
 }
 

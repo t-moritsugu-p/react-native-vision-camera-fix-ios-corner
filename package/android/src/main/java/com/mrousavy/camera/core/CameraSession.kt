@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.util.Log
+import android.util.Size
 import androidx.annotation.MainThread
 import androidx.camera.core.Camera
 import androidx.camera.core.ImageAnalysis
@@ -206,7 +207,8 @@ class CameraSession(internal val context: Context, internal val callback: Callba
   interface Callback {
     fun onError(error: Throwable)
     fun onFrame(frame: Frame)
-    fun onInitialized()
+    // fun onInitialized()
+    fun onInitialized(codeScannerFrame: Size?)
     fun onStarted()
     fun onStopped()
     fun onShutter(type: ShutterType)

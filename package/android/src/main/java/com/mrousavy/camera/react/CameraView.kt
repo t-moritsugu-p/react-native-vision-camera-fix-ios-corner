@@ -3,6 +3,7 @@ package com.mrousavy.camera.react
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
+import android.util.Size
 import android.view.Gravity
 import android.view.ScaleGestureDetector
 import android.widget.FrameLayout
@@ -314,8 +315,8 @@ class CameraView(context: Context) :
     invokeOnError(error)
   }
 
-  override fun onInitialized() {
-    invokeOnInitialized()
+  override fun onInitialized(size: Size?) {
+    invokeOnInitialized(size)
   }
 
   override fun onStarted() {

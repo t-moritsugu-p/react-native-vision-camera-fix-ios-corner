@@ -1,6 +1,7 @@
 package com.mrousavy.camera.core
 
 import android.util.Log
+import android.util.Size
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis.Analyzer
@@ -18,6 +19,7 @@ class CodeScannerPipeline(val configuration: CameraConfiguration.CodeScanner, va
     private const val TAG = "CodeScannerPipeline"
   }
   private val scanner: BarcodeScanner
+  private var isFirst: Boolean
 
   init {
     val types = configuration.codeTypes.map { it.toBarcodeType() }
@@ -25,6 +27,7 @@ class CodeScannerPipeline(val configuration: CameraConfiguration.CodeScanner, va
       .setBarcodeFormats(types[0], *types.toIntArray())
       .build()
     scanner = BarcodeScanning.getClient(barcodeScannerOptions)
+    isFirst = true
   }
 
   @OptIn(ExperimentalGetImage::class)
@@ -33,6 +36,10 @@ class CodeScannerPipeline(val configuration: CameraConfiguration.CodeScanner, va
 
     try {
       val inputImage = InputImage.fromMediaImage(image, imageProxy.imageInfo.rotationDegrees)
+      if (isFirst) {
+        callback.onInitialized(Size(inputImage.width, inputImage.height))
+        isFirst = false;
+      }
       scanner.process(inputImage)
         .addOnSuccessListener { barcodes ->
           if (barcodes.isNotEmpty()) {

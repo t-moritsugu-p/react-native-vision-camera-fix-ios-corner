@@ -2,6 +2,7 @@ package com.mrousavy.camera.core
 
 import android.annotation.SuppressLint
 import android.util.Log
+import android.util.Size
 import androidx.annotation.OptIn
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
@@ -207,6 +208,7 @@ internal fun CameraSession.configureOutputs(configuration: CameraConfiguration) 
     val pipeline = CodeScannerPipeline(codeScannerConfig.config, callback)
     analyzer.setAnalyzer(CameraQueues.analyzerExecutor, pipeline)
     codeScannerOutput = analyzer
+    // この辺りでsizeをセットできれば良いが無理そうなのでCodeScannerPipelineの中で行う
   } else {
     codeScannerOutput = null
   }
@@ -264,7 +266,9 @@ internal suspend fun CameraSession.configureCamera(provider: ProcessCameraProvid
   Log.i(CameraSession.TAG, "Binding ${useCases.size} use-cases...")
   camera = provider.bindToLifecycle(this, cameraSelector, *useCases.toTypedArray())
   // Notify callback
-  callback.onInitialized()
+  // callback.onInitialized()
+  callback.onInitialized(Size(0, 0))
+
 
   // Update currentUseCases for next unbind
   currentUseCases = useCases
