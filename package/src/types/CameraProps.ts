@@ -61,6 +61,8 @@ export interface CameraProps extends ViewProps {
    */
   isActive: boolean
 
+  isKeepAwake: boolean
+
   //#region Use-cases
   /**
    * Enables **preview** streaming.

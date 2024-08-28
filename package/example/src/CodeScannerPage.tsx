@@ -296,6 +296,7 @@ export function CodeScannerPage({ navigation }: Props): React.ReactElement {
             // style={[styles.barcodeArea, {height: cameraHeight > 0? cameraHeight : '100%'}]}
             device={device}
             isActive={isActive}
+            isKeepAwake={true}
             codeScanner={codeScanner} // regionOfInterestは初期化後に設定
             torch={torch ? 'on' : 'off'}
             // enableZoomGesture={true}
