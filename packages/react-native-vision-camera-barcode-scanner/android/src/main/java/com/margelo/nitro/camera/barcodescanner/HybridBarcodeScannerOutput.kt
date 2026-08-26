@@ -91,14 +91,17 @@ class HybridBarcodeScannerOutput(
         imageProxy.image
           ?: throw Error("`ImageProxy` does not have an `Image`!")
 
-      // TODO: Support MirrorMode?
+      // CameraOutput analysis buffers remain in sensor order. Preview mirroring is
+      // applied later by VisionCamera's point-to-view conversion.
       val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+      // Copy all ImageProxy coordinate metadata before starting asynchronous ML processing.
+      val coordinateConverter = BarcodeCoordinateSystemConverter(imageProxy)
       scanner
         .process(inputImage)
         .addOnSuccessListener { barcodes ->
           val hybridBarcodes =
             barcodes
-              .map { HybridBarcode(it) }
+              .map { HybridBarcode(it, coordinateConverter) }
               .toTypedArray<HybridBarcodeSpec>()
           options.onBarcodeScanned(hybridBarcodes)
         }.addOnFailureListener { error ->

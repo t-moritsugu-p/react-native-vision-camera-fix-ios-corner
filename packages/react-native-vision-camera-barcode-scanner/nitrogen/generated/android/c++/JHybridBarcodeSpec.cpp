@@ -23,8 +23,8 @@ namespace margelo::nitro::camera::barcodescanner { enum class BarcodeValueType; 
 #include "Point.hpp"
 #include <vector>
 #include "JPoint.hpp"
-#include <string>
 #include <optional>
+#include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/JArrayBuffer.hpp>
 #include "BarcodeValueType.hpp"
@@ -83,6 +83,25 @@ namespace margelo::nitro::camera::barcodescanner {
       }
       return __vector;
     }(__result);
+  }
+  std::optional<std::vector<Point>> JHybridBarcodeSpec::getCameraCornerPoints() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JArrayClass<JPoint>>()>("getCameraCornerPoints");
+    auto __result = method(_javaPart);
+    return __result != nullptr ? std::make_optional([&](auto&& __input) {
+      size_t __size = __input->size();
+      std::vector<Point> __vector;
+      __vector.reserve(__size);
+      for (size_t __i = 0; __i < __size; __i++) {
+        auto __element = __input->getElement(__i);
+        __vector.push_back(__element->toCpp());
+      }
+      return __vector;
+    }(__result)) : std::nullopt;
+  }
+  std::optional<Rect> JHybridBarcodeSpec::getCameraBoundingBox() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JRect>()>("getCameraBoundingBox");
+    auto __result = method(_javaPart);
+    return __result != nullptr ? std::make_optional(__result->toCpp()) : std::nullopt;
   }
   std::optional<std::string> JHybridBarcodeSpec::getDisplayValue() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>()>("getDisplayValue");

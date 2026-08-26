@@ -6,6 +6,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import com.margelo.nitro.camera.HybridFrameSpec
+import com.margelo.nitro.camera.barcodescanner.extensions.getBarcodeCoordinateSystemConverter
 import com.margelo.nitro.camera.barcodescanner.extensions.toInputImage
 import com.margelo.nitro.camera.barcodescanner.extensions.toMLBarcodeScannerOptions
 import com.margelo.nitro.core.Promise
@@ -19,24 +20,29 @@ class HybridBarcodeScanner(
   @OptIn(ExperimentalGetImage::class)
   override fun scanCodes(frame: HybridFrameSpec): Array<HybridBarcodeSpec> {
     val inputImage = frame.toInputImage()
+    val coordinateConverter = frame.getBarcodeCoordinateSystemConverter()
     val task = scanner.process(inputImage)
     val barcodes = Tasks.await(task)
     return barcodes
-      .map { HybridBarcode(it) }
+      .map { HybridBarcode(it, coordinateConverter) }
       .toTypedArray<HybridBarcodeSpec>()
   }
 
   override fun scanCodesAsync(frame: HybridFrameSpec): Promise<Array<HybridBarcodeSpec>> {
     val inputImage = frame.toInputImage()
-    return process(inputImage)
+    val coordinateConverter = frame.getBarcodeCoordinateSystemConverter()
+    return process(inputImage, coordinateConverter)
   }
 
   override fun scanCodesInImageAsync(image: HybridImageSpec): Promise<Array<HybridBarcodeSpec>> {
     val inputImage = image.toInputImage()
-    return process(inputImage)
+    return process(inputImage, null)
   }
 
-  private fun process(inputImage: InputImage): Promise<Array<HybridBarcodeSpec>> {
+  private fun process(
+    inputImage: InputImage,
+    coordinateConverter: BarcodeCoordinateSystemConverter?,
+  ): Promise<Array<HybridBarcodeSpec>> {
     val promise = Promise<Array<HybridBarcodeSpec>>()
 
     scanner
@@ -44,7 +50,7 @@ class HybridBarcodeScanner(
       .addOnSuccessListener { barcodes ->
         promise.resolve(
           barcodes
-            .map { HybridBarcode(it) }
+            .map { HybridBarcode(it, coordinateConverter) }
             .toTypedArray<HybridBarcodeSpec>(),
         )
       }.addOnFailureListener { error ->

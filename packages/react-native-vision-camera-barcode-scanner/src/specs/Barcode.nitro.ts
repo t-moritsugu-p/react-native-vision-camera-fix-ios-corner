@@ -51,6 +51,27 @@ export interface Barcode
    */
   readonly cornerPoints: Point[]
   /**
+   * Get the {@linkcode Barcode}'s corner points in Camera sensor coordinates.
+   *
+   * Pass these points to
+   * `Camera.convertCameraPointToViewPoint(...)` to obtain coordinates relative
+   * to the Preview View. This is `undefined` when scanning a static
+   * {@linkcode Image}, because there is no Camera coordinate system.
+   *
+   * The Camera coordinate system is platform-defined and must be treated as
+   * opaque. Do not assume these values are normalized.
+   */
+  readonly cameraCornerPoints: Point[] | undefined
+  /**
+   * Get the {@linkcode Barcode}'s axis-aligned bounding box in Camera sensor
+   * coordinates.
+   *
+   * This box encloses all transformed corner points. If ML Kit does not return
+   * corner points, the four corners of {@linkcode boundingBox} are transformed
+   * instead. This is `undefined` when scanning a static {@linkcode Image}.
+   */
+  readonly cameraBoundingBox: Rect | undefined
+  /**
    * Get the {@linkcode Barcode}'s value in a user-friendly format.
    */
   readonly displayValue: string | undefined

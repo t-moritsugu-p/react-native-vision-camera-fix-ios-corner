@@ -21,21 +21,28 @@ class HybridBarcodeScanner: HybridBarcodeScannerSpec {
 
   func scanCodes(frame: any HybridFrameSpec) throws -> [any HybridBarcodeSpec] {
     let mlImage = try frame.toMLImage()
+    let coordinateConverter = frame.getBarcodeCoordinateSystemConverter()
     let barcodes = try scanner.results(in: mlImage)
-    return barcodes.map { HybridBarcode(barcode: $0) }
+    return barcodes.map {
+      HybridBarcode(barcode: $0, coordinateConverter: coordinateConverter)
+    }
   }
 
   func scanCodesAsync(frame: any HybridFrameSpec) throws -> Promise<[any HybridBarcodeSpec]> {
     let mlImage = try frame.toMLImage()
-    return process(mlImage)
+    let coordinateConverter = frame.getBarcodeCoordinateSystemConverter()
+    return process(mlImage, coordinateConverter: coordinateConverter)
   }
 
   func scanCodesInImageAsync(image: any HybridImageSpec) throws -> Promise<[any HybridBarcodeSpec]> {
     let mlImage = try image.toMLImage()
-    return process(mlImage)
+    return process(mlImage, coordinateConverter: nil)
   }
 
-  private func process(_ image: MLImage) -> Promise<[any HybridBarcodeSpec]> {
+  private func process(
+    _ image: MLImage,
+    coordinateConverter: BarcodeCoordinateSystemConverter?
+  ) -> Promise<[any HybridBarcodeSpec]> {
     let promise = Promise<[any HybridBarcodeSpec]>()
 
     scanner.process(image) { barcodes, error in
@@ -44,7 +51,10 @@ class HybridBarcodeScanner: HybridBarcodeScannerSpec {
         return
       }
       if let barcodes {
-        promise.resolve(withResult: barcodes.map { HybridBarcode(barcode: $0) })
+        promise.resolve(
+          withResult: barcodes.map {
+            HybridBarcode(barcode: $0, coordinateConverter: coordinateConverter)
+          })
       } else {
         promise.resolve(withResult: [])
       }

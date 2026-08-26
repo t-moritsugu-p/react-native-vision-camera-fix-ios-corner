@@ -53,6 +53,8 @@ namespace margelo::nitro::camera::barcodescanner {
     BarcodeFormat getFormat() override;
     Rect getBoundingBox() override;
     std::vector<Point> getCornerPoints() override;
+    std::optional<std::vector<Point>> getCameraCornerPoints() override;
+    std::optional<Rect> getCameraBoundingBox() override;
     std::optional<std::string> getDisplayValue() override;
     std::optional<std::shared_ptr<ArrayBuffer>> getRawBytes() override;
     std::optional<std::string> getRawValue() override;

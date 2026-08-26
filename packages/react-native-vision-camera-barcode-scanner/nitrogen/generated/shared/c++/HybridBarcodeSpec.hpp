@@ -26,8 +26,8 @@ namespace margelo::nitro::camera::barcodescanner { enum class BarcodeValueType; 
 #include "Rect.hpp"
 #include "Point.hpp"
 #include <vector>
-#include <string>
 #include <optional>
+#include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include "BarcodeValueType.hpp"
 
@@ -61,6 +61,8 @@ namespace margelo::nitro::camera::barcodescanner {
       virtual BarcodeFormat getFormat() = 0;
       virtual Rect getBoundingBox() = 0;
       virtual std::vector<Point> getCornerPoints() = 0;
+      virtual std::optional<std::vector<Point>> getCameraCornerPoints() = 0;
+      virtual std::optional<Rect> getCameraBoundingBox() = 0;
       virtual std::optional<std::string> getDisplayValue() = 0;
       virtual std::optional<std::shared_ptr<ArrayBuffer>> getRawBytes() = 0;
       virtual std::optional<std::string> getRawValue() = 0;

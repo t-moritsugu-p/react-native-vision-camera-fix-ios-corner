@@ -26,6 +26,8 @@ namespace margelo::nitro::camera { class HybridFrameSpec; }
 namespace margelo::nitro::image { class HybridImageSpec; }
 // Forward declaration of `Point` to properly resolve imports.
 namespace margelo::nitro::camera::barcodescanner { struct Point; }
+// Forward declaration of `Rect` to properly resolve imports.
+namespace margelo::nitro::camera::barcodescanner { struct Rect; }
 // Forward declaration of `TargetBarcodeFormat` to properly resolve imports.
 namespace margelo::nitro::camera::barcodescanner { enum class TargetBarcodeFormat; }
 
@@ -49,6 +51,7 @@ namespace NitroImage { class HybridImageSpec_cxx; }
 #include "HybridBarcodeScannerSpec.hpp"
 #include "HybridBarcodeSpec.hpp"
 #include "Point.hpp"
+#include "Rect.hpp"
 #include "TargetBarcodeFormat.hpp"
 #include <NitroImage/HybridImageSpec.hpp>
 #include <NitroModules/ArrayBuffer.hpp>
@@ -80,6 +83,36 @@ namespace margelo::nitro::camera::barcodescanner::bridge::swift {
     std::vector<Point> vector;
     vector.reserve(size);
     return vector;
+  }
+  
+  // pragma MARK: std::optional<std::vector<Point>>
+  /**
+   * Specialized version of `std::optional<std::vector<Point>>`.
+   */
+  using std__optional_std__vector_Point__ = std::optional<std::vector<Point>>;
+  inline std::optional<std::vector<Point>> create_std__optional_std__vector_Point__(const std::vector<Point>& value) noexcept {
+    return std::optional<std::vector<Point>>(value);
+  }
+  inline bool has_value_std__optional_std__vector_Point__(const std::optional<std::vector<Point>>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::vector<Point> get_std__optional_std__vector_Point__(const std::optional<std::vector<Point>>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<Rect>
+  /**
+   * Specialized version of `std::optional<Rect>`.
+   */
+  using std__optional_Rect_ = std::optional<Rect>;
+  inline std::optional<Rect> create_std__optional_Rect_(const Rect& value) noexcept {
+    return std::optional<Rect>(value);
+  }
+  inline bool has_value_std__optional_Rect_(const std::optional<Rect>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline Rect get_std__optional_Rect_(const std::optional<Rect>& optional) noexcept {
+    return optional.value();
   }
   
   // pragma MARK: std::optional<std::string>

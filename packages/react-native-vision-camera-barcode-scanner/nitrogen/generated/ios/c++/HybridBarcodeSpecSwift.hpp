@@ -27,8 +27,8 @@ namespace margelo::nitro::camera::barcodescanner { enum class BarcodeValueType; 
 #include "Rect.hpp"
 #include "Point.hpp"
 #include <vector>
-#include <string>
 #include <optional>
+#include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/ArrayBufferHolder.hpp>
 #include "BarcodeValueType.hpp"
@@ -88,6 +88,14 @@ namespace margelo::nitro::camera::barcodescanner {
     }
     inline std::vector<Point> getCornerPoints() noexcept override {
       auto __result = _swiftPart.getCornerPoints();
+      return __result;
+    }
+    inline std::optional<std::vector<Point>> getCameraCornerPoints() noexcept override {
+      auto __result = _swiftPart.getCameraCornerPoints();
+      return __result;
+    }
+    inline std::optional<Rect> getCameraBoundingBox() noexcept override {
+      auto __result = _swiftPart.getCameraBoundingBox();
       return __result;
     }
     inline std::optional<std::string> getDisplayValue() noexcept override {

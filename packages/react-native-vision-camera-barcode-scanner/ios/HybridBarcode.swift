@@ -10,9 +10,61 @@ import NitroModules
 
 final class HybridBarcode: HybridBarcodeSpec {
   private let barcode: Barcode
+  private let originalCornerPoints: [Point]
+  let cameraCornerPoints: [Point]?
+  let cameraBoundingBox: Rect?
 
-  init(barcode: Barcode) {
+  init(
+    barcode: Barcode,
+    coordinateConverter: BarcodeCoordinateSystemConverter? = nil
+  ) {
     self.barcode = barcode
+
+    let originalCornerPoints: [Point] =
+      barcode.cornerPoints?.map { value in
+        guard let point = value as? CGPoint else {
+          return Point(x: 0.0, y: 0.0)
+        }
+        return Point(x: point.x, y: point.y)
+      } ?? []
+    self.originalCornerPoints = originalCornerPoints
+
+    if let coordinateConverter {
+      let cameraCornerPoints = originalCornerPoints.map {
+        coordinateConverter.convertBarcodePointToCameraPoint($0)
+      }
+      self.cameraCornerPoints = cameraCornerPoints
+
+      let sourcePoints: [Point]
+      if originalCornerPoints.isEmpty {
+        let frame = barcode.frame
+        let left = frame.origin.x
+        let right = frame.origin.x + frame.size.width
+        let top = frame.origin.y
+        let bottom = frame.origin.y + frame.size.height
+        sourcePoints = [
+          Point(x: left, y: top),
+          Point(x: right, y: top),
+          Point(x: right, y: bottom),
+          Point(x: left, y: bottom),
+        ]
+      } else {
+        sourcePoints = originalCornerPoints
+      }
+
+      let cameraBoxPoints = sourcePoints.map {
+        coordinateConverter.convertBarcodePointToCameraPoint($0)
+      }
+      self.cameraBoundingBox = Rect(
+        left: cameraBoxPoints.map(\.x).min() ?? 0.0,
+        right: cameraBoxPoints.map(\.x).max() ?? 0.0,
+        top: cameraBoxPoints.map(\.y).min() ?? 0.0,
+        bottom: cameraBoxPoints.map(\.y).max() ?? 0.0)
+    } else {
+      self.cameraCornerPoints = nil
+      self.cameraBoundingBox = nil
+    }
+
     super.init()
   }
 
@@ -30,15 +82,7 @@ final class HybridBarcode: HybridBarcodeSpec {
   }
 
   var cornerPoints: [Point] {
-    guard let points = barcode.cornerPoints else {
-      return []
-    }
-    return points.map { value in
-      guard let point = value as? CGPoint else {
-        return Point(x: 0.0, y: 0.0)
-      }
-      return Point(x: point.x, y: point.y)
-    }
+    return originalCornerPoints
   }
 
   var displayValue: String? {

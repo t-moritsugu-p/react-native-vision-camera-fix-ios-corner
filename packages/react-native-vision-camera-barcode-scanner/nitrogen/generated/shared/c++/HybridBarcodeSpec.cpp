@@ -17,6 +17,8 @@ namespace margelo::nitro::camera::barcodescanner {
       prototype.registerHybridGetter("format", &HybridBarcodeSpec::getFormat);
       prototype.registerHybridGetter("boundingBox", &HybridBarcodeSpec::getBoundingBox);
       prototype.registerHybridGetter("cornerPoints", &HybridBarcodeSpec::getCornerPoints);
+      prototype.registerHybridGetter("cameraCornerPoints", &HybridBarcodeSpec::getCameraCornerPoints);
+      prototype.registerHybridGetter("cameraBoundingBox", &HybridBarcodeSpec::getCameraBoundingBox);
       prototype.registerHybridGetter("displayValue", &HybridBarcodeSpec::getDisplayValue);
       prototype.registerHybridGetter("rawBytes", &HybridBarcodeSpec::getRawBytes);
       prototype.registerHybridGetter("rawValue", &HybridBarcodeSpec::getRawValue);

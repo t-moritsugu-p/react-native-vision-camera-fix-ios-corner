@@ -25,22 +25,20 @@ export interface BarcodeScanner
    * All coordinates in the {@linkcode Barcode} are
    * relative to the {@linkcode Frame}'s coordinate system.
    *
-   * You can convert {@linkcode Barcode} coordinates to Camera coordinates using
-   * {@linkcode Frame.convertFramePointToCameraPoint | Frame.convertFramePointToCameraPoint(...)},
-   * and then convert the Camera coordinates to Preview View coordinates using
+   * Each Barcode also contains `cameraCornerPoints` and `cameraBoundingBox`
+   * converted to Camera sensor coordinates. You can convert those Camera
+   * coordinates to Preview View coordinates using
    * {@linkcode PreviewViewMethods.convertCameraPointToViewPoint | PreviewViewMethods.convertCameraPointToViewPoint(...)}.
    *
    * @example
    * ```ts
    * const scanner = // ...
-   * const frame = // ...
    * const previewView = // ...
    *
    * const barcodes = scanner.scanCodes(frame)
    * for (const barcode of barcodes) {
    *   console.log('Barcode value:', barcode.rawValue)
-   *   for (const point of barcode.cornerPoints) {
-   *     const cameraPoint = frame.convertFramePointToCameraPoint(point)
+   *   for (const cameraPoint of barcode.cameraCornerPoints ?? []) {
    *     const previewPoint = previewView.convertCameraPointToViewPoint(cameraPoint)
    *     console.log('Corner Point:', previewPoint)
    *   }

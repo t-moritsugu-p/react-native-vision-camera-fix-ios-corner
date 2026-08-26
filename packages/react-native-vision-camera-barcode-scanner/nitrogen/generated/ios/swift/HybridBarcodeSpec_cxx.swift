@@ -148,6 +148,38 @@ open class HybridBarcodeSpec_cxx {
     }
   }
   
+  public final var cameraCornerPoints: bridge.std__optional_std__vector_Point__ {
+    @inline(__always)
+    get {
+      return { () -> bridge.std__optional_std__vector_Point__ in
+        if let __unwrappedValue = self.__implementation.cameraCornerPoints {
+          return bridge.create_std__optional_std__vector_Point__({ () -> bridge.std__vector_Point_ in
+            var __vector = bridge.create_std__vector_Point_(__unwrappedValue.count)
+            for __item in __unwrappedValue {
+              __vector.push_back(__item)
+            }
+            return __vector
+          }())
+        } else {
+          return .init()
+        }
+      }()
+    }
+  }
+  
+  public final var cameraBoundingBox: bridge.std__optional_Rect_ {
+    @inline(__always)
+    get {
+      return { () -> bridge.std__optional_Rect_ in
+        if let __unwrappedValue = self.__implementation.cameraBoundingBox {
+          return bridge.create_std__optional_Rect_(__unwrappedValue)
+        } else {
+          return .init()
+        }
+      }()
+    }
+  }
+  
   public final var displayValue: bridge.std__optional_std__string_ {
     @inline(__always)
     get {

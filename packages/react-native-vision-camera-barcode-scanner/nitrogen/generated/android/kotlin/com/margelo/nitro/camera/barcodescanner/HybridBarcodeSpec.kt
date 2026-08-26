@@ -40,6 +40,14 @@ abstract class HybridBarcodeSpec: HybridObject() {
   
   @get:DoNotStrip
   @get:Keep
+  abstract val cameraCornerPoints: Array<Point>?
+  
+  @get:DoNotStrip
+  @get:Keep
+  abstract val cameraBoundingBox: Rect?
+  
+  @get:DoNotStrip
+  @get:Keep
   abstract val displayValue: String?
   
   @get:DoNotStrip

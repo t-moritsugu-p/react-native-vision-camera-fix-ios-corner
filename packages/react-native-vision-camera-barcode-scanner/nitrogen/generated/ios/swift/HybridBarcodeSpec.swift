@@ -13,6 +13,8 @@ public protocol HybridBarcodeSpec_protocol: HybridObject {
   var format: BarcodeFormat { get }
   var boundingBox: Rect { get }
   var cornerPoints: [Point] { get }
+  var cameraCornerPoints: [Point]? { get }
+  var cameraBoundingBox: Rect? { get }
   var displayValue: String? { get }
   var rawBytes: ArrayBuffer? { get }
   var rawValue: String? { get }
