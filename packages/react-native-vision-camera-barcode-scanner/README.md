@@ -3,7 +3,7 @@
 This is VisionCamera Barcode Scanner. Install it through npm:
 
 ```sh
-npm install @t-mrtgu/react-native-vision-camera-barcode-scanner react-native-nitro-image
+npm install @t-mrtgu/react-native-vision-camera-barcode-scanner@camera-coords react-native-nitro-image
 ```
 
 VisionCamera Barcode Scanner depends on VisionCamera Core and Nitro Image.
