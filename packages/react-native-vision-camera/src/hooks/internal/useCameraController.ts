@@ -6,15 +6,16 @@ import type { CameraDevice } from '../../specs/inputs/CameraDevice.nitro'
 import type { CameraOutput } from '../../specs/outputs/CameraOutput.nitro'
 import type { CameraSession } from '../../specs/session/CameraSession.nitro'
 import type { CameraSessionConfig } from '../../specs/session/CameraSessionConfig.nitro'
+import type { CameraSessionConfiguration } from '../../specs/session/CameraSessionConfiguration'
 import { useMemoizedArray } from './useMemoizedArray'
 import { useStableCallback } from './useStableCallback'
 
-interface Config {
+interface Config extends CameraSessionConfiguration {
   mirrorMode?: MirrorMode
-  allowBackgroundAudioPlayback?: boolean
   constraints?: Constraint[]
   onSessionConfigSelected?: (config: CameraSessionConfig) => void
 
+  onError: (error: Error) => void
   onConfigured?: () => void
   getInitialZoom?: () => number | undefined
   getInitialExposureBias?: () => number | undefined
@@ -36,10 +37,12 @@ export function useCameraController(
     constraints = [],
     onSessionConfigSelected,
     allowBackgroundAudioPlayback,
+    allowHapticsAndSystemSoundsPlayback,
     getInitialExposureBias,
+    onError,
     onConfigured,
     getInitialZoom,
-  }: Config = {},
+  }: Config,
 ): CameraController | undefined {
   const [controller, setController] = useState<CameraController>()
 
@@ -55,6 +58,7 @@ export function useCameraController(
   const stableOnSessionConfigSelected = useStableCallback(
     onSessionConfigSelected ?? (() => {}),
   )
+  const stableOnError = useStableCallback(onError)
 
   // TODO: Can we use something like useSyncExternalStore or whatever to avoid "wrong" dependencies?
   // biome-ignore lint/correctness/useExhaustiveDependencies: It's an array of objects, we either have to deep-memo or just stringify.
@@ -78,36 +82,44 @@ export function useCameraController(
 
     let isCanceled = false
     const load = async () => {
-      if (device == null) {
-        // No device, configure with empty devices
-        session.configure([], {})
-        setController(undefined)
-      } else {
-        // Device + outputs - configure session
-        const controllers = await session.configure(
-          [
+      try {
+        if (device == null) {
+          // No device, configure with empty devices
+          session.configure([], {})
+          setController(undefined)
+        } else {
+          // Device + outputs - configure session
+          const controllers = await session.configure(
+            [
+              {
+                input: device,
+                outputs: stableOutputs.map((o) => ({
+                  output: o,
+                  mirrorMode: mirrorMode,
+                })),
+                constraints: stableConstraints,
+                initialExposureBias: stableGetInitialExposureBias?.(),
+                initialZoom: stableGetInitialZoom?.(),
+                onSessionConfigSelected: stableOnSessionConfigSelected,
+              },
+            ],
             {
-              input: device,
-              outputs: stableOutputs.map((o) => ({
-                output: o,
-                mirrorMode: mirrorMode,
-              })),
-              constraints: stableConstraints,
-              initialExposureBias: stableGetInitialExposureBias?.(),
-              initialZoom: stableGetInitialZoom?.(),
-              onSessionConfigSelected: stableOnSessionConfigSelected,
+              allowBackgroundAudioPlayback: allowBackgroundAudioPlayback,
+              allowHapticsAndSystemSoundsPlayback:
+                allowHapticsAndSystemSoundsPlayback,
             },
-          ],
-          { allowBackgroundAudioPlayback: allowBackgroundAudioPlayback },
-        )
-        if (isCanceled) {
-          controllers.forEach((c) => {
-            c.dispose()
-          })
-          return
+          )
+          if (isCanceled) {
+            controllers.forEach((c) => {
+              c.dispose()
+            })
+            return
+          }
+          stableOnConfigured?.()
+          setController(controllers[0])
         }
-        stableOnConfigured?.()
-        setController(controllers[0])
+      } catch (error) {
+        stableOnError(error as Error)
       }
     }
     load()
@@ -119,12 +131,14 @@ export function useCameraController(
     mirrorMode,
     session,
     allowBackgroundAudioPlayback,
+    allowHapticsAndSystemSoundsPlayback,
     stableOutputs,
     stableOnConfigured,
     stableGetInitialExposureBias,
     stableGetInitialZoom,
     stableOnSessionConfigSelected,
     stableConstraints,
+    stableOnError,
   ])
 
   return controller

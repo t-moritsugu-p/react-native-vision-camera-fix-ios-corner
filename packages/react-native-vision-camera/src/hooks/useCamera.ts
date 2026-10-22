@@ -20,6 +20,7 @@ import type {
   InterruptionReason,
 } from '../specs/session/CameraSession.nitro'
 import type { CameraSessionConfig } from '../specs/session/CameraSessionConfig.nitro'
+import type { CameraSessionConfiguration } from '../specs/session/CameraSessionConfiguration'
 import type { CameraSessionConnection } from '../specs/session/CameraSessionConnection'
 import { useCameraController } from './internal/useCameraController'
 import { useCameraControllerConfiguration } from './internal/useCameraControllerConfiguration'
@@ -32,7 +33,9 @@ import { useZoomUpdater } from './internal/useZoomUpdater'
 import { useCameraDevices } from './useCameraDevices'
 import { useOrientation } from './useOrientation'
 
-export interface CameraProps {
+export interface CameraProps
+  extends CameraSessionConfiguration,
+    CameraControllerConfiguration {
   // Session Configuration
   /**
    * Starts the {@linkcode CameraSession} when set to `true`, and stops it
@@ -93,34 +96,6 @@ export interface CameraProps {
    * @default 'auto'
    */
   mirrorMode?: MirrorMode
-
-  // Camera Controller Configuration
-  /**
-   * If `true`, auto-focus transitions are performed slower and smoother
-   * to appear less intrusive in video recordings.
-   *
-   * @see {@linkcode CameraControllerConfiguration.enableSmoothAutoFocus}
-   * @platform iOS
-   * @default false
-   */
-  enableSmoothAutoFocus?: boolean
-  /**
-   * If `true`, the Camera pipeline may extend exposure times (effectively
-   * dropping frame rate) in low-light scenes to receive more light.
-   *
-   * @see {@linkcode CameraControllerConfiguration.enableLowLightBoost}
-   * @default false
-   */
-  enableLowLightBoost?: boolean
-  /**
-   * If `true`, geometric distortion at the edges (e.g. on ultra-wide-angle
-   * cameras) is corrected, at the cost of a small amount of field of view.
-   *
-   * @see {@linkcode CameraControllerConfiguration.enableDistortionCorrection}
-   * @platform iOS
-   * @default true
-   */
-  enableDistortionCorrection?: boolean
 
   // Declarative props
   /**
@@ -269,6 +244,8 @@ export function useCamera({
   onSessionConfigSelected,
   mirrorMode,
   onConfigured,
+  allowBackgroundAudioPlayback,
+  allowHapticsAndSystemSoundsPlayback,
   orientationSource = 'device',
   onStarted,
   onStopped,
@@ -284,7 +261,10 @@ export function useCamera({
   torchMode,
 }: CameraProps): CameraController | undefined {
   // 1. Create session
-  const session = useCameraSession({ enableMultiCamSupport: false })
+  const session = useCameraSession({
+    enableMultiCamSupport: false,
+    onError: onError,
+  })
 
   // 2. Update output orientations
   const orientationSourceOrUndefined =
@@ -326,18 +306,25 @@ export function useCamera({
     getInitialZoom: () => getAnimatableNumberInitialValue(zoom),
     constraints: constraints,
     onSessionConfigSelected: onSessionConfigSelected,
+    allowBackgroundAudioPlayback: allowBackgroundAudioPlayback,
+    allowHapticsAndSystemSoundsPlayback: allowHapticsAndSystemSoundsPlayback,
+    onError: onError,
   })
 
   // 5. Configure the Controller with some settings
-  useCameraControllerConfiguration(controller, {
-    enableSmoothAutoFocus: enableSmoothAutoFocus,
-    enableDistortionCorrection: enableDistortionCorrection,
-    enableLowLightBoost: enableLowLightBoost,
-  })
+  useCameraControllerConfiguration(
+    controller,
+    {
+      enableSmoothAutoFocus: enableSmoothAutoFocus,
+      enableDistortionCorrection: enableDistortionCorrection,
+      enableLowLightBoost: enableLowLightBoost,
+    },
+    onError,
+  )
 
   // 6. Start (or stop) the Session if we have a Controller and `isActive` is true.
   const hasController = controller != null
-  useCameraSessionIsRunning(session, isActive && hasController)
+  useCameraSessionIsRunning(session, isActive && hasController, onError)
 
   // 7. Set up listeners and delegate to JS
   useListenerSubscription(session, 'addOnStartedListener', onStarted)

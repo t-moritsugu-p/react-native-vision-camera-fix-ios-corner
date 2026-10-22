@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'react-native-harness'
+import { assert, beforeAll, describe, expect, it } from 'react-native-harness'
 import type {
   CameraDevice,
   CameraDeviceFactory,
@@ -29,8 +29,7 @@ describe('VisionCamera - Controller', () => {
     expect(VisionCamera.cameraPermissionStatus).toBe('authorized')
     factory = await VisionCamera.createDeviceFactory()
     const back = factory.getDefaultCamera('back')
-    expect(back).toBeDefined()
-    if (back == null) throw new Error('no back camera')
+    assert.exists(back, 'no back camera')
     backDevice = back
   })
 
@@ -619,11 +618,6 @@ describe('VisionCamera - Controller', () => {
       expect(controller.minZoom).toBeLessThanOrEqual(controller.maxZoom)
       expect(controller.zoom).toBeGreaterThanOrEqual(controller.minZoom)
       expect(controller.zoom).toBeLessThanOrEqual(controller.maxZoom)
-      console.log(
-        `controller: zoom=${controller.zoom} displayable=${controller.displayableZoomFactor} ` +
-          `focusMode=${controller.focusMode} exposureMode=${controller.exposureMode} wbMode=${controller.whiteBalanceMode} ` +
-          `isConnected=${controller.isConnected}`,
-      )
     } finally {
       await session.stop()
     }

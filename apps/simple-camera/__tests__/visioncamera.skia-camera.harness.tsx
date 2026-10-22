@@ -1,13 +1,5 @@
 import { StyleSheet } from 'react-native'
-import {
-  afterEach,
-  beforeAll,
-  cleanup,
-  describe,
-  expect,
-  it,
-  render,
-} from 'react-native-harness'
+import { beforeAll, describe, expect, it, render } from 'react-native-harness'
 import type { CameraDevice, Size } from 'react-native-vision-camera'
 import { CommonResolutions, VisionCamera } from 'react-native-vision-camera'
 import { SkiaCamera } from 'react-native-vision-camera-skia'
@@ -48,7 +40,7 @@ async function streamFrameSize(
     if (width > 0 && height > 0) received.resolve({ width, height })
   }
 
-  await render(
+  const { unmount } = await render(
     <SkiaCamera
       device={device}
       isActive={true}
@@ -74,7 +66,7 @@ async function streamFrameSize(
       `SkiaCamera Frame at ${targetResolution?.width}x${targetResolution?.height}`,
     )
   } finally {
-    cleanup()
+    unmount()
   }
 }
 
@@ -143,10 +135,6 @@ describe('VisionCamera - SkiaCamera targetResolution', () => {
     backDevice = back
   })
 
-  afterEach(() => {
-    cleanup()
-  })
-
   it('streams Frames at the requested targetResolution', async (context) => {
     const targetResolution = CommonResolutions.FHD_4_3
     if (!supportsResolution(backDevice, targetResolution)) {
@@ -157,9 +145,6 @@ describe('VisionCamera - SkiaCamera targetResolution', () => {
 
     const streamed = await streamFrameSize(backDevice, targetResolution)
 
-    console.log(
-      `SkiaCamera requested=${targetResolution.width}x${targetResolution.height} streamed=${streamed.width}x${streamed.height}`,
-    )
     expect(getEdges(streamed)).toEqual(getEdges(targetResolution))
   })
 
@@ -173,9 +158,6 @@ describe('VisionCamera - SkiaCamera targetResolution', () => {
 
     const streamed = await streamFrameSize(backDevice, undefined)
 
-    console.log(
-      `SkiaCamera (no targetResolution) streamed=${streamed.width}x${streamed.height}`,
-    )
     expect(getEdges(streamed)).toEqual(getEdges(defaultResolution))
   })
 
@@ -190,9 +172,6 @@ describe('VisionCamera - SkiaCamera targetResolution', () => {
     const skia = await streamFrameSize(backDevice, targetResolution)
     const native = await nativeFrameOutputSize(backDevice, targetResolution)
 
-    console.log(
-      `parity requested=${targetResolution.width}x${targetResolution.height} skia=${skia.width}x${skia.height} native=${native.width}x${native.height}`,
-    )
     expect(getEdges(skia)).toEqual(getEdges(native))
   })
 })
