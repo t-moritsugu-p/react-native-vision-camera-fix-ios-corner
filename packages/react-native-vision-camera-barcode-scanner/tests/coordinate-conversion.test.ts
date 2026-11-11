@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 
+// Arithmetic model tests only: these do not execute Swift/Kotlin, ML Kit,
+// CameraX or Nitro. Run test:native:ios for the production Swift converters.
+// Device tests are still required to validate detected points on the preview.
+
 interface Point {
   x: number
   y: number
@@ -71,14 +75,16 @@ function cameraToAndroidPreviewPoint(
   return isMirrored ? { x: previewWidth - point.x, y: point.y } : point
 }
 
-function officialIosFrameToCameraPoint(
+function modelIosFrameToCameraPoint(
   framePoint: Point,
   frameWidth: number,
   frameHeight: number,
   orientation: Orientation,
   isMirrored: boolean,
 ): Point {
-  const x = framePoint.x / frameWidth
+  // CoreGraphics concatenates the mirror before the orientation transform.
+  const normalizedX = framePoint.x / frameWidth
+  const x = isMirrored ? 1 - normalizedX : normalizedX
   const y = framePoint.y / frameHeight
 
   let cameraPoint: Point
@@ -90,29 +96,14 @@ function officialIosFrameToCameraPoint(
       cameraPoint = { x: 1 - x, y: 1 - y }
       break
     case 'left':
-      cameraPoint = { x: y, y: 1 - x }
-      break
-    case 'right':
       cameraPoint = { x: 1 - y, y: x }
       break
+    case 'right':
+      cameraPoint = { x: y, y: 1 - x }
+      break
   }
 
-  return isMirrored ? { x: 1 - cameraPoint.x, y: cameraPoint.y } : cameraPoint
-}
-
-function cameraPointToIosBarcodePoint(
-  cameraPoint: Point,
-  frameWidth: number,
-  frameHeight: number,
-  orientation: Orientation,
-): Point {
-  const swapsDimensions = orientation === 'left' || orientation === 'right'
-  const barcodeWidth = swapsDimensions ? frameHeight : frameWidth
-  const barcodeHeight = swapsDimensions ? frameWidth : frameHeight
-  return {
-    x: cameraPoint.x * barcodeWidth,
-    y: cameraPoint.y * barcodeHeight,
-  }
+  return cameraPoint
 }
 
 function iosBarcodeToCameraPoint(
@@ -163,7 +154,7 @@ function expectPoint(actual: Point, expected: Point): void {
   expect(actual.y).toBeCloseTo(expected.y, 10)
 }
 
-describe('Android ML Kit barcode to Camera sensor conversion', () => {
+describe('Android coordinate arithmetic model (not native integration)', () => {
   const frameWidth = 640
   const frameHeight = 480
   const framePoint = { x: 123, y: 234 }
@@ -213,62 +204,50 @@ describe('Android ML Kit barcode to Camera sensor conversion', () => {
   })
 })
 
-describe('iOS ML Kit barcode to Camera sensor conversion', () => {
+describe('iOS coordinate arithmetic model (not ML Kit observations)', () => {
   const frameWidth = 640
   const frameHeight = 480
   const framePoint = { x: 123, y: 234 }
 
-  for (const orientation of ['up', 'right', 'down', 'left'] as const) {
-    for (const isMirrored of [false, true]) {
-      test(`matches VisionCamera Frame conversion for ${orientation}, mirror=${isMirrored}`, () => {
-        const expectedCameraPoint = officialIosFrameToCameraPoint(
+  // Fixed expected values, independently checked by the native CoreGraphics
+  // harness. Do not derive test inputs by reversing the function under test.
+  const cases: [Orientation, boolean, Point][] = [
+    ['up', false, { x: 0.1921875, y: 0.4875 }],
+    ['up', true, { x: 0.8078125, y: 0.4875 }],
+    ['down', false, { x: 0.8078125, y: 0.5125 }],
+    ['down', true, { x: 0.1921875, y: 0.5125 }],
+    ['left', false, { x: 0.5125, y: 0.1921875 }],
+    ['left', true, { x: 0.5125, y: 0.8078125 }],
+    ['right', false, { x: 0.4875, y: 0.8078125 }],
+    ['right', true, { x: 0.4875, y: 0.1921875 }],
+  ]
+  for (const [orientation, isMirrored, expected] of cases) {
+    test(`frame model: ${orientation}, mirror=${isMirrored}`, () => {
+      expectPoint(
+        modelIosFrameToCameraPoint(
           framePoint,
           frameWidth,
           frameHeight,
           orientation,
           isMirrored,
-        )
-        // ML Kit has already applied MLImage.orientation (including mirror) and
-        // returns geometry in this oriented view coordinate system.
-        const barcodePoint = cameraPointToIosBarcodePoint(
-          expectedCameraPoint,
-          frameWidth,
-          frameHeight,
-          orientation,
-        )
-
-        expectPoint(
-          iosBarcodeToCameraPoint(
-            barcodePoint,
-            frameWidth,
-            frameHeight,
-            orientation,
-          ),
-          expectedCameraPoint,
-        )
-      })
-    }
+        ),
+        expected,
+      )
+    })
   }
 
-  test('is independent of preview-size and full-resolution buffer scales', () => {
-    const expectedCameraPoint = { x: 0.23, y: 0.71 }
-
-    for (const [width, height] of [
-      [640, 480],
-      [4032, 3024],
-    ]) {
-      const barcodePoint = cameraPointToIosBarcodePoint(
-        expectedCameraPoint,
-        width,
-        height,
-        'right',
-      )
+  for (const orientation of ['up', 'right', 'down', 'left'] as const) {
+    test(`normalizes synthetic image coordinates: ${orientation}`, () => {
+      const expected =
+        orientation === 'up' || orientation === 'down'
+          ? { x: 0.1921875, y: 0.4875 }
+          : { x: 0.25625, y: 0.365625 }
       expectPoint(
-        iosBarcodeToCameraPoint(barcodePoint, width, height, 'right'),
-        expectedCameraPoint,
+        iosBarcodeToCameraPoint({ x: 123, y: 234 }, 640, 480, orientation),
+        expected,
       )
-    }
-  })
+    })
+  }
 })
 
 describe('camera bounding boxes', () => {

@@ -7,11 +7,68 @@ Pod::Spec.new do |s|
   s.version      = package["version"]
   s.summary      = package["description"]
   s.homepage     = package["homepage"]
-  s.license      = package["license"]
+  s.license      = { :type => package["license"], :file => "LICENSE" }
   s.authors      = package["author"]
 
   s.platforms    = { :ios => 15.5, :visionos => 1.0 }
-  s.source       = { :git => "https://github.com/mrousavy/nitro.git", :tag => "#{s.version}" }
+  # The scanner has its own release tags, independent of upstream core tags.
+  # Publish this tag on the fork before distributing the corresponding release.
+  s.source       = {
+    :git => package["repository"]["url"].sub(/\Agit\+/, ""),
+    :tag => "barcode-scanner-v#{s.version}"
+  }
+
+  # CocoaPods can run this for local :path Pods too. A complete npm package
+  # must be validated without writes; only a monorepo needs source placement.
+  s.prepare_command = <<-CMD
+    set -eu
+    ruby -rjson -rfileutils <<'RUBY'
+begin
+  expected_name = '@t-mrtgu/react-native-vision-camera-barcode-scanner'
+  expected_version = '#{s.version}'
+  root_package = JSON.parse(File.read('package.json'))
+  if root_package['name'] == expected_name
+    source = '.'
+  elsif root_package['name'] == 'react-native-vision-camera-monorepo'
+    source = 'packages/react-native-vision-camera-barcode-scanner'
+  else
+    raise 'unrecognized package layout'
+  end
+
+  manifest = JSON.parse(File.read(File.join(source, 'package.json')))
+  unless manifest['name'] == expected_name && manifest['version'] == expected_version
+    raise 'scanner name/version does not match this podspec'
+  end
+  required = %w[
+    LICENSE ios/HybridBarcode.swift ios/BarcodeCoordinateSystemConverter.swift
+    nitrogen/generated/ios/VisionCameraBarcodeScanner+autolinking.rb
+    nitrogen/generated/shared/c++/HybridBarcodeSpec.cpp
+  ]
+  required.each do |entry|
+    raise 'missing source file: ' + entry unless File.file?(File.join(source, entry))
+  end
+
+  unless source == '.'
+    entries = %w[ios nitrogen LICENSE]
+    entries << 'cpp' if File.directory?(File.join(source, 'cpp'))
+    # Preflight all collisions before copying anything. A repeat invocation
+    # accepts identical outputs but never overwrites unrelated existing files.
+    entries.each do |entry|
+      origin = File.join(source, entry)
+      raise 'symlink source/output: ' + entry if File.symlink?(origin) || File.symlink?(entry)
+      if File.exist?(entry) && !system('diff', '-qr', origin, entry, :out => File::NULL, :err => File::NULL)
+        raise 'conflicting output: ' + entry
+      end
+    end
+    entries.each do |entry|
+      FileUtils.cp_r(File.join(source, entry), entry) unless File.exist?(entry)
+    end
+  end
+rescue StandardError => error
+  abort 'VisionCameraBarcodeScanner prepare: ' + error.message
+end
+RUBY
+  CMD
 
   s.source_files = [
     # Implementation (Swift)

@@ -9,11 +9,11 @@ import VisionCamera
 /// Converts ML Kit barcode points into the normalized capture-device coordinate
 /// space expected by VisionCamera on iOS.
 ///
-/// ML Kit reports geometry in the detected image's view coordinate system, so
-/// the orientation and mirroring supplied on MLImage are already reflected in
-/// each point. The only remaining operation is scaling by the oriented image
-/// dimensions. This is equivalent to VisionCamera's
-/// FrameCoordinateSystemConverter for the same orientation and mirror state.
+/// Assumes ML Kit points already reflect the orientation and mirroring supplied
+/// on MLImage, so only scaling by the oriented image dimensions remains.
+/// Host tests verify this normalization, not the ML Kit assumption. Confirm
+/// detected points against the actual preview on devices for each orientation
+/// and mirror state before claiming equivalence with the core Frame converter.
 final class BarcodeCoordinateSystemConverter {
   private let barcodeWidth: Double
   private let barcodeHeight: Double

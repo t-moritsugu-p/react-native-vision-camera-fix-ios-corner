@@ -24,10 +24,13 @@
     "ios/**/*.swift",
     "nitro.json",
     "*.podspec",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "test": "bun test tests",
+    "test:native:ios": "bash tests/native/ios/run.sh",
+    "test:package": "ruby tests/package-metadata.rb",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf android/build node_modules/**/android/build lib",
     "build": "tsc",
